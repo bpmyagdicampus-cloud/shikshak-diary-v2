@@ -9,7 +9,7 @@ export default function Organizations() {
   const [rows, setRows] = useState<Org[]>([]);
   const [name, setName] = useState("");
   const [nameEn, setNameEn] = useState("");
-  const [startMonth, setStartMonth] = useState(4); // श्रावण
+  const [startMonth, setStartMonth] = useState(4); // Shrawan (BS month 4)
   const [msg, setMsg] = useState("");
 
   const load = async () => {
