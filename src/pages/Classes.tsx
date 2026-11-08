@@ -4,7 +4,7 @@ import { useAllowedOrgs } from "../lib/orgs";
 import OrgSelect from "../components/OrgSelect";
 import { useT } from "../lib/i18n";
 
-type Opt = { id: string; name: string; name_en?: string | null };
+type Opt = { id: string; name: string; name_en?: string | null; is_active?: boolean };
 type Cls = { id: string; name: string; department_id: string; program_id: string | null };
 type Sec = { id: string; class_id: string; name: string };
 

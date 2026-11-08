@@ -15,10 +15,10 @@ type Row = {
 };
 
 const ROLES = [
-  { v: "admin", ne: tx("एडमिन", "Admin"), en: "Admin" },
-  { v: "department_head", ne: tx("विभाग प्रमुख", "Department head"), en: "Department head" },
-  { v: "teacher", ne: tx("शिक्षक", "Teacher"), en: "Teacher" },
-  { v: "student", ne: tx("विद्यार्थी", "Student"), en: "Student" },
+  { v: "admin", ne: "एडमिन", en: "Admin" },
+  { v: "department_head", ne: "विभाग प्रमुख", en: "Department head" },
+  { v: "teacher", ne: "शिक्षक", en: "Teacher" },
+  { v: "student", ne: "विद्यार्थी", en: "Student" },
 ];
 
 export default function Members() {
