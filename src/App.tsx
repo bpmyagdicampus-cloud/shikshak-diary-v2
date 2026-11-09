@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./lib/auth";
 import { useT } from "./lib/i18n";
@@ -34,6 +34,14 @@ function RequireRole({ ok, children }: { ok: boolean; children: ReactNode }) {
 
 export default function App() {
   const { session, isSuperAdmin, memberships, loading } = useAuth();
+
+  // Reset link कुनै पनि path मा आए पनि नयाँ पासवर्ड पृष्ठमा लैजाने (redirect allow-list छुटे पनि)
+  useEffect(() => {
+    if (window.location.hash.includes("type=recovery") && window.location.pathname !== "/reset-password") {
+      window.location.replace("/reset-password" + window.location.hash);
+    }
+  }, []);
+
   if (loading) return <Loading />;
   const isAdmin = memberships.some((m) => m.role === "admin");
   const isHead = memberships.some((m) => m.role === "department_head");
