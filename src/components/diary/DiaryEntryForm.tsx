@@ -1,7 +1,7 @@
 import type { FormEvent } from "react";
 import { useT } from "../../lib/i18n";
 import type { DiaryDraft, MyClassSubject } from "../../hooks/useDiary";
-import { CLASS_ACTIVITIES, MAX_LH } from "../../hooks/useDiary";
+import { MAX_LH } from "../../hooks/useDiary";
 
 /** Stateless: मान र callback props बाट आउँछ */
 export interface DiaryEntryFormProps {
@@ -16,17 +16,12 @@ export interface DiaryEntryFormProps {
 }
 
 const YEARS = Array.from({ length: 21 }, (_, i) => 2075 + i);
-const MONTHS: { ne: string; en: string }[] = [
-  { ne: "बैशाख", en: "Baisakh" }, { ne: "जेठ", en: "Jestha" }, { ne: "असार", en: "Ashad" },
-  { ne: "साउन", en: "Shrawan" }, { ne: "भदौ", en: "Bhadra" }, { ne: "असोज", en: "Ashwin" },
-  { ne: "कार्तिक", en: "Kartik" }, { ne: "मंसिर", en: "Mangsir" }, { ne: "पुष", en: "Poush" },
-  { ne: "माघ", en: "Magh" }, { ne: "फागुन", en: "Falgun" }, { ne: "चैत", en: "Chaitra" },
-];
-
+const MONTHS_NE = ["बैशाख", "जेठ", "असार", "साउन", "भदौ", "असोज", "कार्तिक", "मंसिर", "पुष", "माघ", "फागुन", "चैत"];
+const MONTHS_EN = ["Baisakh", "Jestha", "Ashad", "Shrawan", "Bhadra", "Ashwin", "Kartik", "Mangsir", "Poush", "Magh", "Falgun", "Chaitra"];
 
 export default function DiaryEntryForm({ options, draft, onChange, onSubmit, onCancel, busy, editing, errorText }: DiaryEntryFormProps) {
-  const { tx, pick } = useT();
-  const months = MONTHS.map((m) => tx(m.ne, m.en));
+  const { tx, pick, lang } = useT();
+  const months = lang === "ne" ? MONTHS_NE : MONTHS_EN;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -104,60 +99,6 @@ export default function DiaryEntryForm({ options, draft, onChange, onSubmit, onC
       <div className="sm:col-span-2">
         <label className={label}>{tx("टिप्पणी", "Remarks")}</label>
         <textarea className="field min-h-16" value={draft.remarks} onChange={(e) => onChange({ remarks: e.target.value })} />
-      </div>
-
-      <div className="sm:col-span-2 space-y-2">
-        <div className={label}>{tx("कक्षा क्रियाकलाप कोड (मासिक प्रतिवेदनका लागि)", "Class activity codes (for monthly report)")}</div>
-        <div className="flex flex-wrap gap-2">
-          {CLASS_ACTIVITIES.map((a) => {
-            const on = draft.activities.includes(a.code);
-            return (
-              <button
-                key={a.code}
-                type="button"
-                onClick={() =>
-                  onChange({ activities: on ? draft.activities.filter((c) => c !== a.code) : [...draft.activities, a.code] })
-                }
-                className={`rounded-full border px-3 py-1 text-xs font-semibold ${on ? "border-brand bg-brand text-white" : "border-slate-300 bg-white"}`}
-              >
-                {a.code} · {tx(a.ne, a.en)}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <details className="sm:col-span-2 rounded-lg border border-slate-200 p-3">
-        <summary className="cursor-pointer text-sm font-semibold">
-          {tx("शिक्षण विधि, विद्यार्थी क्रियाकलाप र मूल्याङ्कन", "Methods, student activities & evaluation")}
-        </summary>
-        <div className="mt-3 grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className={label}>{tx("प्रयोग गरिएको शिक्षण विधि", "Methods & methodology used")}</label>
-            <textarea className="field min-h-20" value={draft.methods} onChange={(e) => onChange({ methods: e.target.value })} />
-          </div>
-          <div>
-            <label className={label}>{tx("विद्यार्थी क्रियाकलाप", "Students' activities")}</label>
-            <textarea className="field min-h-20" value={draft.studentActivities} onChange={(e) => onChange({ studentActivities: e.target.value })} />
-          </div>
-          <div>
-            <label className={label}>{tx("विद्यार्थी पृष्ठपोषण", "Students' feedback")}</label>
-            <textarea className="field min-h-20" value={draft.studentFeedback} onChange={(e) => onChange({ studentFeedback: e.target.value })} />
-          </div>
-          <div>
-            <label className={label}>{tx("गरिएको मूल्याङ्कन", "Evaluation done")}</label>
-            <textarea className="field min-h-20" value={draft.evaluationDone} onChange={(e) => onChange({ evaluationDone: e.target.value })} />
-          </div>
-        </div>
-      </details>
-
-      <div className="sm:col-span-2">
-        <label className={label}>{tx("विशेष कैफियत", "Special remark")}</label>
-        <textarea className="field min-h-16" placeholder={tx("विशेष कैफियत लेख्नुहोस्", "Write a special remark")} value={draft.specialRemark} onChange={(e) => onChange({ specialRemark: e.target.value })} />
-        <label className="mt-2 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={draft.specialInMonthly} onChange={(e) => onChange({ specialInMonthly: e.target.checked })} />
-          {tx("मासिक प्रतिवेदनको Remarks मा देखाउनुहोस्", "Include in monthly report remarks")}
-        </label>
       </div>
 
       {errorText && <p className="sm:col-span-2 text-sm text-red-600">{errorText}</p>}

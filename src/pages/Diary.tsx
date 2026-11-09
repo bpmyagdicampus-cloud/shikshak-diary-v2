@@ -18,13 +18,6 @@ const emptyDraft = (): DiaryDraft => ({
   presentCount: 0,
   absentCount: 0,
   remarks: "",
-  activities: [],
-  specialRemark: "",
-  specialInMonthly: false,
-  methods: "",
-  studentActivities: "",
-  studentFeedback: "",
-  evaluationDone: "",
 });
 
 const DIARY_ERROR_KEYS: DiaryErrorKey[] = [
@@ -41,8 +34,6 @@ export default function Diary() {
   const [busy, setBusy] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [viewId, setViewId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [classFilter, setClassFilter] = useState("");
 
   const errorMessage = (key: string): string => {
     const map: Record<DiaryErrorKey, string> = {
@@ -71,13 +62,6 @@ export default function Diary() {
       presentCount: e.presentCount,
       absentCount: e.absentCount,
       remarks: e.remarks,
-      activities: e.activities,
-      specialRemark: e.specialRemark,
-      specialInMonthly: e.specialInMonthly,
-      methods: e.methods,
-      studentActivities: e.studentActivities,
-      studentFeedback: e.studentFeedback,
-      evaluationDone: e.evaluationDone,
     });
   };
 
@@ -121,13 +105,6 @@ export default function Diary() {
     ];
   };
 
-  const q = search.trim().toLowerCase();
-  const visibleEntries = diary.entries.filter(
-    (e) =>
-      (!classFilter || e.classSubjectId === classFilter) &&
-      (!q || e.topic.toLowerCase().includes(q) || e.entryDate.includes(q))
-  );
-
   const csLabel = (id: string) => {
     const c = diary.classSubjects.find((x) => x.id === id);
     return c ? `${pick(c.classNameNe, c.classNameEn)} · ${pick(c.subjectNameNe, c.subjectNameEn)}` : "—";
@@ -153,21 +130,11 @@ export default function Diary() {
         errorText={errorText}
       />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <input className="field max-w-xs" placeholder={tx("पाठ वा मिति खोज्नुहोस्", "Search topic or date")} value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select className="field max-w-xs" value={classFilter} onChange={(e) => setClassFilter(e.target.value)}>
-          <option value="">{tx("सबै कक्षा", "All classes")}</option>
-          {diary.classSubjects.map((c) => (
-            <option key={c.id} value={c.id}>{pick(c.classNameNe, c.classNameEn)} · {pick(c.subjectNameNe, c.subjectNameEn)}</option>
-          ))}
-        </select>
-      </div>
-
       {diary.error && <p className="text-sm text-red-600">{diary.error}</p>}
       {diary.loading && <p className="text-sm text-slate-500">{tx("लोड हुँदैछ…", "Loading…")}</p>}
 
       <div className="space-y-3">
-        {visibleEntries.map((e) => (
+        {diary.entries.map((e) => (
           <EntryRow
             key={e.id}
             title={`${displayDate(e.entryDate, datePref)} · ${csLabel(e.classSubjectId)} · LH ${e.lh}`}

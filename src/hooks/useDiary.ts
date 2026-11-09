@@ -8,23 +8,6 @@ import { adIsoToBs, bsToAdIso } from "../lib/dates";
 /* ------------------------------------------------------------------ */
 
 export const EDIT_WINDOW_DAYS = 7;
-
-/** कक्षा क्रियाकलाप कोड (मासिक प्रतिवेदनको लागि छोटो कोड) */
-export const CLASS_ACTIVITIES: { code: string; ne: string; en: string }[] = [
-  { code: "L", ne: "लेक्चर", en: "Lecture" },
-  { code: "ICT", ne: "ICT / PPT", en: "ICT / PPT" },
-  { code: "D", ne: "छलफल", en: "Discussion" },
-  { code: "GW", ne: "समूह कार्य", en: "Group work" },
-  { code: "P", ne: "प्रस्तुति", en: "Presentation" },
-  { code: "Q", ne: "क्विज", en: "Quiz" },
-  { code: "OQ", ne: "मौखिक प्रश्न", en: "Oral question" },
-  { code: "SA", ne: "विद्यार्थी क्रियाकलाप", en: "Student activity" },
-  { code: "Dm", ne: "प्रदर्शन", en: "Demonstration" },
-  { code: "PW", ne: "परियोजना कार्य", en: "Project work" },
-  { code: "CT", ne: "कक्षा परीक्षा", en: "Class test" },
-  { code: "R", ne: "पुनरावलोकन", en: "Revision" },
-  { code: "F", ne: "पृष्ठपोषण", en: "Feedback" },
-];
 export const MAX_LH = 12;
 
 /* ------------------------------------------------------------------ */
@@ -57,13 +40,6 @@ export interface DiaryEntry {
   presentCount: number;
   absentCount: number;
   remarks: string;
-  activities: string[];
-  specialRemark: string;
-  specialInMonthly: boolean;
-  methods: string;
-  studentActivities: string;
-  studentFeedback: string;
-  evaluationDone: string;
 }
 
 export interface DiaryDraft {
@@ -76,13 +52,6 @@ export interface DiaryDraft {
   presentCount: number;
   absentCount: number;
   remarks: string;
-  activities: string[];
-  specialRemark: string;
-  specialInMonthly: boolean;
-  methods: string;
-  studentActivities: string;
-  studentFeedback: string;
-  evaluationDone: string;
 }
 
 interface CsRow {
@@ -104,13 +73,6 @@ interface DiaryRow {
   present_count: number;
   absent_count: number;
   remarks: string;
-  activities: string[] | null;
-  special_remark: string;
-  special_in_monthly: boolean;
-  methods: string;
-  student_activities: string;
-  student_feedback: string;
-  evaluation_done: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -254,7 +216,7 @@ export function useDiary(): UseDiaryResult {
 
       const dRes = await supabase
         .from("diary_entries")
-        .select("id,class_subject_id,entry_date,lh,unit,topic,total_students,present_count,absent_count,remarks,activities,special_remark,special_in_monthly,methods,student_activities,student_feedback,evaluation_done")
+        .select("id,class_subject_id,entry_date,lh,unit,topic,total_students,present_count,absent_count,remarks")
         .eq("teacher_user_id", userId)
         .eq("org_id", orgId)
         .order("entry_date", { ascending: false })
@@ -273,13 +235,6 @@ export function useDiary(): UseDiaryResult {
           presentCount: r.present_count,
           absentCount: r.absent_count,
           remarks: r.remarks,
-          activities: r.activities ?? [],
-          specialRemark: r.special_remark,
-          specialInMonthly: r.special_in_monthly,
-          methods: r.methods,
-          studentActivities: r.student_activities,
-          studentFeedback: r.student_feedback,
-          evaluationDone: r.evaluation_done,
         }))
       );
     } catch (err) {
@@ -307,13 +262,6 @@ export function useDiary(): UseDiaryResult {
         present_count: draft.presentCount,
         absent_count: draft.absentCount,
         remarks: draft.remarks.trim(),
-        activities: draft.activities,
-        special_remark: draft.specialRemark.trim(),
-        special_in_monthly: draft.specialInMonthly,
-        methods: draft.methods.trim(),
-        student_activities: draft.studentActivities.trim(),
-        student_feedback: draft.studentFeedback.trim(),
-        evaluation_done: draft.evaluationDone.trim(),
       };
       const res = editingId
         ? await supabase.from("diary_entries").update(row).eq("id", editingId)
