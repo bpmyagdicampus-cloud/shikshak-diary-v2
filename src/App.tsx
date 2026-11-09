@@ -4,6 +4,7 @@ import { useAuth } from "./lib/auth";
 import { useT } from "./lib/i18n";
 import Shell from "./components/Shell";
 import Login from "./pages/Login";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Organizations from "./pages/Organizations";
 import AcademicYears from "./pages/AcademicYears";
@@ -41,6 +42,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={session ? <Navigate to="/" replace /> : <Login />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route element={<RequireAuth><Shell /></RequireAuth>}>
         <Route index element={<Dashboard />} />
         <Route path="superadmins" element={<RequireRole ok={isSuperAdmin}><SuperAdmins /></RequireRole>} />

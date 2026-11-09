@@ -3,13 +3,25 @@ import { supabase } from "../lib/supabase";
 import { useT, type Lang } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
 
+const SITE = typeof window !== "undefined" ? window.location.origin : "";
+
 export default function Login() {
-  const { t, lang, setLang } = useT();
+  const { t, lang, setLang, tx } = useT();
   const { session } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [info, setInfo] = useState("");
+
+  const forgot = async () => {
+    setErr("");
+    setInfo("");
+    if (!email.trim()) return setErr(tx("पहिले इमेल लेख्नुहोस्।", "Enter your email first."));
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${SITE}/reset-password` });
+    if (error) return setErr(error.message);
+    setInfo(tx("रिसेट लिंक इमेलमा पठाइयो। इमेल जाँच्नुहोस्।", "A reset link was sent to your email."));
+  };
 
   if (session) return null;
 
@@ -50,6 +62,10 @@ export default function Login() {
             <input className="field" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </label>
           {err && <p className="text-sm text-red-600">{err}</p>}
+          {info && <p className="text-sm text-emerald-700">{info}</p>}
+          <button type="button" className="w-full text-sm text-brand underline" onClick={() => void forgot()}>
+            {tx("पासवर्ड बिर्सनुभयो?", "Forgot password?")}
+          </button>
           <button className="btn w-full" disabled={busy}>{t("signIn")}</button>
         </form>
       </div>
