@@ -70,40 +70,47 @@ Deno.serve(async (req) => {
       if (role === "admin") return json({ error: "Admin सिर्फ super admin ले बनाउँछ / Only super admin can create admins" }, 403);
     }
 
-    // ४. user बनाउने (पहिल्यै छ भने त्यही प्रयोग)
-    const password = tempPassword();
+    // ४. पहिले इमेल पहिल्यै छ कि जाँच; छैन भने मात्र नयाँ user बनाउने
+    const givenPw = String(body.password ?? "").trim();
+    if (givenPw && givenPw.length < 8) return json({ error: "पासवर्ड कम्तीमा ८ अक्षरको हुनुपर्छ / Password must be at least 8 characters" }, 400);
+    const password = givenPw || tempPassword();
     let userId: string | null = null;
     let created = false;
-    const { data: newUser, error: cErr } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name: fullName },
-    });
-    if (newUser?.user) {
+
+    const { data: list, error: lErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    if (lErr) return json({ error: `User खोज्न सकेन: ${lErr.message}` }, 500);
+    const existing = list.users.find((u) => (u.email ?? "").toLowerCase() === email);
+
+    if (existing) {
+      userId = existing.id;
+    } else {
+      const { data: newUser, error: cErr } = await admin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { full_name: fullName },
+      });
+      // वास्तविक त्रुटि सिधै फर्काउने (अनुमान गरिँदैन)
+      if (cErr || !newUser?.user) {
+        return json({ error: `User बनाउन सकिएन: ${cErr?.message ?? "unknown error"}` }, 400);
+      }
       userId = newUser.user.id;
       created = true;
-    } else if (cErr && /already|registered|exists/i.test(cErr.message)) {
-      const { data: prof } = await admin.from("profiles").select("id").eq("email", email).maybeSingle();
-      userId = prof?.id ?? null;
-      if (!userId) {
-        const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-        userId = list?.users.find((u) => (u.email ?? "").toLowerCase() === email)?.id ?? null;
-      }
-      if (!userId) return json({ error: "Email पहिल्यै छ तर user भेटिएन / Email exists but user not found" }, 409);
-    } else if (cErr) {
-      return json({ error: cErr.message }, 400);
     }
 
     // ५. profile र सदस्यता
-    await admin.from("profiles").upsert({ id: userId!, full_name: fullName, email, phone }, { onConflict: "id" });
+    const { error: pErr } = await admin
+      .from("profiles")
+      .upsert({ id: userId!, full_name: fullName, email, phone }, { onConflict: "id" });
+    if (pErr) return json({ error: `Profile: ${pErr.message}` }, 400);
+
     const { error: mErr } = await admin.from("memberships").insert({
       user_id: userId!,
       org_id: orgId,
       role,
       department_id: deptId,
     });
-    if (mErr) return json({ error: mErr.message }, 400);
+    if (mErr) return json({ error: `सदस्यता: ${mErr.message}` }, 400);
 
     return json({
       ok: true,

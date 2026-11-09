@@ -24,7 +24,9 @@ export default function NewUserForm({
   const [dept, setDept] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [pw, setPw] = useState("");
   const [tempPw, setTempPw] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const needsDept = role === "department_head" || role === "teacher";
   const roles = [
@@ -47,12 +49,14 @@ export default function NewUserForm({
         role,
         org_id: orgId,
         department_id: needsDept ? dept : null,
+        password: pw || undefined,
       },
     });
     setBusy(false);
     if (error || (data && data.error)) {
       return setMsg(data?.error ?? error?.message ?? tx("त्रुटि भयो", "Something went wrong"));
     }
+    setPw("");
     if (data?.created) {
       setTempPw(data.temporary_password);
       setMsg(tx("नयाँ user बनाइयो। अस्थायी पासवर्ड एकपटक मात्र देखिन्छ, सुरक्षित रूपमा हस्तान्तरण गर्नुहोस्।", "New user created. The temporary password is shown once; hand it over securely."));
@@ -78,14 +82,31 @@ export default function NewUserForm({
         <option value="">{needsDept ? tx("विभाग छान्नुहोस् (अनिवार्य)", "Select department (required)") : tx("विभाग (आवश्यक छैन)", "Department (not required)")}</option>
         {depts.map((d) => <option key={d.id} value={d.id}>{pick(d.name, d.name_en)}</option>)}
       </select>
+      <input className="field sm:col-span-2" type="text" autoComplete="off" placeholder={tx("अस्थायी पासवर्ड (खाली छोडे स्वतः बन्छ, कम्तीमा ८ अक्षर)", "Temporary password (leave blank to auto-generate, min 8 chars)")} value={pw} onChange={(e) => setPw(e.target.value)} />
       <div className="sm:col-span-2 flex flex-wrap items-center gap-2">
         <button className="btn" disabled={busy}>{tx("user बनाउनुहोस्", "Create user")}</button>
       </div>
       {msg && <p className="text-sm text-slate-700 sm:col-span-2">{msg}</p>}
       {tempPw && (
-        <p className="rounded-lg bg-amber-50 p-3 font-mono text-sm sm:col-span-2">
-          {tx("अस्थायी पासवर्ड:", "Temporary password:")} <b>{tempPw}</b>
-        </p>
+        <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 sm:col-span-2">
+          <div className="text-sm">{tx("अस्थायी पासवर्ड (यहीँ नोट गर्नुहोस्):", "Temporary password (note it now):")}</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="rounded bg-white px-2 py-1 font-mono text-base">{tempPw}</code>
+            <button
+              type="button"
+              className="btn-ghost text-xs"
+              onClick={() => {
+                void navigator.clipboard?.writeText(tempPw);
+                setCopied(true);
+              }}
+            >
+              {copied ? tx("कपी भयो", "Copied") : tx("कपी गर्नुहोस्", "Copy")}
+            </button>
+            <button type="button" className="btn-ghost text-xs" onClick={() => { setTempPw(null); setCopied(false); }}>
+              {tx("बन्द गर्नुहोस्", "Close")}
+            </button>
+          </div>
+        </div>
       )}
     </form>
   );

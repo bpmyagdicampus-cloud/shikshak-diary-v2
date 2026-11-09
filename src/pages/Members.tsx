@@ -62,12 +62,28 @@ export default function Members() {
       supabase.from("departments").select("id,name,name_en").eq("org_id", id).order("name"),
       supabase
         .from("memberships")
-        .select("id,user_id,role,department_id,is_active,profiles(full_name,email,phone)")
+        .select("id,user_id,role,department_id,is_active")
         .eq("org_id", id)
         .order("created_at"),
     ]);
     setDepts((d.data ?? []) as Dept[]);
-    setRows((m.data ?? []) as unknown as Row[]);
+    if (m.error) {
+      setRows([]);
+      return setMsg(m.error.message);
+    }
+    const mem = (m.data ?? []) as { id: string; user_id: string; role: string; department_id: string | null; is_active: boolean }[];
+    const ids = [...new Set(mem.map((x) => x.user_id))];
+    const { data: profs, error: pErr } = ids.length
+      ? await supabase.from("profiles").select("id,full_name,email,phone").in("id", ids)
+      : { data: [], error: null };
+    if (pErr) setMsg(pErr.message);
+    const byId = new Map(((profs ?? []) as { id: string; full_name: string; email: string | null; phone: string | null }[]).map((p) => [p.id, p]));
+    setRows(
+      mem.map((x) => ({
+        ...x,
+        profiles: byId.get(x.user_id) ?? null,
+      })) as Row[]
+    );
   };
 
   useEffect(() => {
