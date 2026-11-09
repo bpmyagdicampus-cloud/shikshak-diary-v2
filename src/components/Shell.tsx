@@ -14,6 +14,7 @@ export default function Shell() {
     { to: "/", ne: "ड्यासबोर्ड", en: "Dashboard", show: true },
     { to: "/account", ne: "मेरो खाता", en: "My account", show: true },
     { to: "/superadmins", ne: "सुपर एडमिन", en: "Super admins", show: isSuperAdmin },
+    { to: "/campus", ne: "क्याम्पस", en: "Campus", show: isSuperAdmin || isAdmin },
     { to: "/orgs", ne: "संस्था", en: "Organizations", show: isSuperAdmin },
     { to: "/departments", ne: "विभाग", en: "Departments", show: isSuperAdmin || isAdmin },
     { to: "/classes", ne: "कक्षा", en: "Classes", show: isSuperAdmin || isAdmin || isHead },

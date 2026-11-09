@@ -14,6 +14,7 @@ import Classes from "./pages/Classes";
 import Subjects from "./pages/Subjects";
 import Members from "./pages/Members";
 import Account from "./pages/Account";
+import Campus from "./pages/Campus";
 
 function Loading() {
   const { t } = useT();
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="account" element={<Account />} />
         <Route path="superadmins" element={<RequireRole ok={isSuperAdmin}><SuperAdmins /></RequireRole>} />
         <Route path="orgs" element={<RequireRole ok={isSuperAdmin}><Organizations /></RequireRole>} />
+        <Route path="campus" element={<RequireRole ok={staff}><Campus /></RequireRole>} />
         <Route path="departments" element={<RequireRole ok={staff}><Departments /></RequireRole>} />
         <Route path="classes" element={<RequireRole ok={staff || isHead}><Classes /></RequireRole>} />
         <Route path="subjects" element={<RequireRole ok={staff || isHead}><Subjects /></RequireRole>} />
