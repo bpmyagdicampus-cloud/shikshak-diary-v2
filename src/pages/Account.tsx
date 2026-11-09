@@ -6,7 +6,8 @@ import { useT } from "../lib/i18n";
 /** लगइन भएपछि आफ्नो पासवर्ड परिवर्तन (email link बिना) */
 export default function Account() {
   const { tx } = useT();
-  const { profile, session } = useAuth();
+  const { profile, session, reload } = useAuth();
+  const forced = !!profile?.must_change_password;
   const [current, setCurrent] = useState("");
   const [p1, setP1] = useState("");
   const [p2, setP2] = useState("");
@@ -25,15 +26,24 @@ export default function Account() {
     if (!email) return setMsg(tx("इमेल फेला परेन।", "Email not found."));
 
     setBusy(true);
-    // हालको पासवर्ड सही हो कि जाँच (सुरक्षाका लागि)
-    const { error: authErr } = await supabase.auth.signInWithPassword({ email, password: current });
-    if (authErr) {
-      setBusy(false);
-      return setMsg(tx("हालको पासवर्ड गलत छ।", "The current password is incorrect."));
+    // रिसेट पछिको पहिलो परिवर्तनमा हालको (अस्थायी) पासवर्ड जाँच्न आवश्यक छैन
+    if (!forced) {
+      const { error: authErr } = await supabase.auth.signInWithPassword({ email, password: current });
+      if (authErr) {
+        setBusy(false);
+        return setMsg(tx("हालको पासवर्ड गलत छ।", "The current password is incorrect."));
+      }
     }
     const { error } = await supabase.auth.updateUser({ password: p1 });
+    if (error) {
+      setBusy(false);
+      return setMsg(error.message);
+    }
+    if (forced && profile) {
+      await supabase.from("profiles").update({ must_change_password: false }).eq("id", profile.id);
+      await reload();
+    }
     setBusy(false);
-    if (error) return setMsg(error.message);
     setCurrent("");
     setP1("");
     setP2("");
@@ -51,7 +61,11 @@ export default function Account() {
 
       <form onSubmit={change} className="card space-y-3">
         <div className="font-semibold">{tx("पासवर्ड परिवर्तन", "Change password")}</div>
-        <input className="field" type="password" autoComplete="current-password" required placeholder={tx("हालको पासवर्ड", "Current password")} value={current} onChange={(e) => setCurrent(e.target.value)} />
+        {forced ? (
+          <p className="rounded-lg bg-amber-50 p-3 text-sm">{tx("तपाईंको पासवर्ड रिसेट गरिएको छ। अगाडि बढ्न नयाँ पासवर्ड सेट गर्नुहोस्।", "Your password was reset. Set a new password to continue.")}</p>
+        ) : (
+          <input className="field" type="password" autoComplete="current-password" required placeholder={tx("हालको पासवर्ड", "Current password")} value={current} onChange={(e) => setCurrent(e.target.value)} />
+        )}
         <input className="field" type="password" autoComplete="new-password" required placeholder={tx("नयाँ पासवर्ड", "New password")} value={p1} onChange={(e) => setP1(e.target.value)} />
         <input className="field" type="password" autoComplete="new-password" required placeholder={tx("नयाँ पासवर्ड पुनः", "Confirm new password")} value={p2} onChange={(e) => setP2(e.target.value)} />
         {msg && <p className={`text-sm ${ok ? "text-emerald-700" : "text-red-600"}`}>{msg}</p>}

@@ -10,6 +10,7 @@ export type Profile = {
   email: string | null;
   lang: "ne" | "en";
   date_pref: "bs" | "ad";
+  must_change_password: boolean;
 };
 
 export type Membership = {
@@ -83,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const uid = s.user.id;
     const [p, sa, m] = await Promise.all([
-      supabase.from("profiles").select("id,full_name,email,lang,date_pref").eq("id", uid).maybeSingle(),
+      supabase.from("profiles").select("id,full_name,email,lang,date_pref,must_change_password").eq("id", uid).maybeSingle(),
       supabase.from("platform_roles").select("user_id").eq("user_id", uid).maybeSingle(),
       supabase
         .from("memberships")

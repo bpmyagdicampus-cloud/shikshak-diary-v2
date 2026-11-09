@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./lib/auth";
 import { useT } from "./lib/i18n";
 import Shell from "./components/Shell";
@@ -35,7 +35,8 @@ function RequireRole({ ok, children }: { ok: boolean; children: ReactNode }) {
 }
 
 export default function App() {
-  const { session, can, loading } = useAuth();
+  const { session, can, loading, profile } = useAuth();
+  const location = useLocation();
 
   // Reset link कुनै पनि path मा आए पनि नयाँ पासवर्ड पृष्ठमा लैजाने (redirect allow-list छुटे पनि)
   useEffect(() => {
@@ -45,6 +46,11 @@ export default function App() {
   }, []);
 
   if (loading) return <Loading />;
+
+  // पासवर्ड रिसेट भएको user ले पहिले नयाँ पासवर्ड सेट गर्नुपर्छ
+  if (session && profile?.must_change_password && location.pathname !== "/account" && location.pathname !== "/reset-password") {
+    return <Navigate to="/account" replace />;
+  }
 
   return (
     <Routes>

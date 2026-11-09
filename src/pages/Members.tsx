@@ -32,6 +32,16 @@ export default function Members() {
   const [depts, setDepts] = useState<Dept[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [msg, setMsg] = useState("");
+  const [resetInfo, setResetInfo] = useState<{ name: string; pw: string } | null>(null);
+
+  const resetPassword = async (r: Row) => {
+    if (!confirm(tx("यो user को पासवर्ड रिसेट गर्ने?", "Reset this user's password?"))) return;
+    setMsg("");
+    setResetInfo(null);
+    const { data, error } = await supabase.functions.invoke("reset-user-password", { body: { user_id: r.user_id, org_id: orgId } });
+    if (error || (data && data.error)) return setMsg(data?.error ?? error?.message ?? tx("त्रुटि भयो", "Something went wrong"));
+    setResetInfo({ name: r.profiles?.full_name ?? "", pw: data.temporary_password });
+  };
 
   // नयाँ सदस्यता (user पहिल्यै बनेको हुनुपर्छ; इमेलबाट खोजिन्छ)
   const [email, setEmail] = useState("");
@@ -137,6 +147,13 @@ export default function Members() {
       </form>
 
       {msg && <p className="text-sm text-slate-600">{msg}</p>}
+      {resetInfo && (
+        <div className="card space-y-2 border-amber-300 bg-amber-50 text-sm">
+          <div>{tx("अस्थायी पासवर्ड (एकपटक मात्र देखिन्छ):", "Temporary password (shown once only):")} <b className="font-mono">{resetInfo.pw}</b></div>
+          <div className="text-slate-600">{resetInfo.name} — {tx("यो पासवर्ड user लाई सुरक्षित रूपमा दिनुहोस्। पहिलो लगइनमा नयाँ पासवर्ड सेट गर्नु पर्छ।", "Give this to the user securely. They must set a new password at first login.")}</div>
+          <button className="btn-ghost text-xs" onClick={() => setResetInfo(null)}>{tx("बन्द गर्नुहोस्", "Close")}</button>
+        </div>
+      )}
 
       <div className="space-y-2">
         {rows.map((r) => (
@@ -151,6 +168,9 @@ export default function Members() {
               </div>
               <div className="flex gap-2">
                 <button className="btn-ghost text-xs" onClick={() => startEdit(r)}>{tx("सम्पादन", "Edit")}</button>
+                {can.campusAdmin && (
+                  <button className="btn-ghost text-xs" onClick={() => void resetPassword(r)}>{tx("पासवर्ड रिसेट", "Reset password")}</button>
+                )}
                 <button className="btn-ghost text-xs" onClick={() => void toggle(r)}>{r.is_active ? tx("निष्क्रिय", "Deactivate") : tx("सक्रिय", "Activate")}</button>
               </div>
             </div>
