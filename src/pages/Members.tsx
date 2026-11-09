@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "../lib/supabase";
 import { useAllowedOrgs } from "../lib/orgs";
 import OrgSelect from "../components/OrgSelect";
+import NewUserForm from "../components/NewUserForm";
+import { useAuth } from "../lib/auth";
 import { useT } from "../lib/i18n";
 
 type Dept = { id: string; name: string; name_en?: string | null };
@@ -24,6 +26,8 @@ const ROLES = [
 export default function Members() {
   const { tx, pick } = useT();
   const { orgs, ready, defaultOrgId } = useAllowedOrgs();
+  const { can } = useAuth();
+  const [showNew, setShowNew] = useState(false);
   const [orgId, setOrgId] = useState("");
   const [depts, setDepts] = useState<Dept[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
@@ -110,6 +114,16 @@ export default function Members() {
       <h1 className="text-2xl font-bold">{tx("सदस्य र भूमिका · Members & Roles", "Members & Roles")}</h1>
       <OrgSelect orgs={orgs} value={orgId} onChange={setOrgId} />
 
+      <div>
+        <button type="button" className="btn-ghost" onClick={() => setShowNew((v) => !v)}>
+          {showNew ? tx("फारम बन्द गर्नुहोस्", "Close form") : tx("नयाँ user बनाउनुहोस्", "Create new user")}
+        </button>
+      </div>
+      {showNew && orgId && (
+        <NewUserForm orgId={orgId} depts={depts} allowAdmin={can.superAdmin} onDone={() => void load(orgId)} />
+      )}
+
+      <div className="text-sm font-semibold text-slate-600">{tx("अवस्थित user लाई इमेलबाट थप्नुहोस्", "Add an existing user by email")}</div>
       <form onSubmit={addMember} className="card grid gap-3 sm:grid-cols-4">
         <input className="field" type="email" required placeholder={tx("इमेल (user पहिल्यै बनेको)", "Email (existing user)")} value={email} onChange={(e) => setEmail(e.target.value)} />
         <select className="field" value={role} onChange={(e) => setRole(e.target.value)}>
