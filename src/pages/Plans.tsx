@@ -8,6 +8,9 @@ import { asRows } from "../lib/crud";
 import { usePlanning, useMyClassSubjectsForPlan, type LessonDraft, type LessonRow, type PlanStatus, type UnitDraft, type UnitRow } from "../hooks/usePlanning";
 import ItemMenu, { type ItemAction } from "../components/ItemMenu";
 import EntryRow from "../components/EntryRow";
+import BsDateInput from "../components/common/BsDateInput";
+import { useCalendarSummary } from "../hooks/useCalendarSummary";
+import { displayDate } from "../lib/dates";
 
 type Tab = "units" | "lessons" | "approve";
 
@@ -37,6 +40,10 @@ export default function Plans() {
   const [pending, setPending] = useState<PendingUnit[]>([]);
 
   const canApprove = can.campusAdmin || can.deptHead;
+  const cal = useCalendarSummary();
+  const datePref = useAuthStore((s) => s.profile?.datePref ?? "bs");
+  const selected = mine.items.find((x) => x.id === csId) ?? null;
+  const plannedLhSum = plan.units.reduce((sum, u) => sum + u.plannedLh, 0);
 
   // स्वीकृति बाँकी एकाइ (विभाग प्रमुख/admin, RLS अनुसार)
   useEffect(() => {
@@ -143,6 +150,52 @@ export default function Plans() {
 
       {tab === "units" && csId && (
         <div className="space-y-4">
+          {selected && (
+            <div className="card space-y-3 border-2 border-brand/30">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="font-semibold">
+                  {pick(selected.classNameNe, selected.classNameEn)} · {pick(selected.subjectNameNe, selected.subjectNameEn)}
+                  {cal.yearName && <span className="ml-2 text-sm text-slate-500">({tx("शैक्षिक वर्ष", "Academic year")} {cal.yearName})</span>}
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs">
+                  {plannedLhSum >= selected.totalLh ? tx("योजना पूरा", "Plan complete") : tx("योजना बाँकी", "Plan incomplete")}
+                </span>
+              </div>
+              {!cal.loaded && <p className="text-sm text-slate-500">{tx("लोड हुँदैछ…", "Loading…")}</p>}
+              {cal.loaded && !cal.yearName && (
+                <p className="text-sm text-amber-700">{tx("सक्रिय शैक्षिक वर्ष छैन।", "No active academic year.")}</p>
+              )}
+              {cal.yearName && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <div className="text-xs text-slate-500">{tx("खुद पढाउने दिन", "Net teaching days")}</div>
+                    <div className="text-2xl font-bold">{cal.netTeachingDays} {tx("दिन", "days")}</div>
+                    <div className="text-xs text-slate-500">{tx("योजना LH", "Planned LH")}: {plannedLhSum} / {selected.totalLh}</div>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <div className="text-xs text-slate-500">{tx("कुल कार्यदिन", "Total working days")}</div>
+                    <div className="text-2xl font-bold">{cal.totalWorkingDays} {tx("दिन", "days")}</div>
+                    <div className="text-xs text-slate-500">{tx("साप्ताहिक बिदा बाहेक", "Excluding weekly off")}</div>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <div className="text-xs text-slate-500">{tx("त्रैमासिक परीक्षा", "Term exams")}</div>
+                    {cal.exams.length === 0 && <div className="text-sm">{tx("कुनै छैन", "None")}</div>}
+                    {cal.exams.map((e) => (
+                      <div key={e.id} className="text-sm">{e.title}: {displayDate(e.startDate, datePref)} – {displayDate(e.endDate, datePref)}</div>
+                    ))}
+                  </div>
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <div className="text-xs text-slate-500">{tx("बिदा", "Vacations")}</div>
+                    {cal.vacations.length === 0 && <div className="text-sm">{tx("कुनै छैन", "None")}</div>}
+                    {cal.vacations.map((e) => (
+                      <div key={e.id} className="text-sm">{e.title}: {displayDate(e.startDate, datePref)} – {displayDate(e.endDate, datePref)}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {cal.error && <p className="text-sm text-red-600">{cal.error}</p>}
+            </div>
+          )}
           {!unitEdit && (
             <button className="btn" onClick={() => setUnitEdit({ id: null, draft: emptyUnit(plan.units.length + 1) })}>
               {tx("नयाँ एकाइ थप्नुहोस्", "Add unit")}
@@ -157,17 +210,32 @@ export default function Plans() {
                 if (ok) setUnitEdit(null);
               }}
             >
-              <input className="field" type="number" min={1} value={unitEdit.draft.unitNo} onChange={(e) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, unitNo: Number(e.target.value) } })} placeholder={tx("एकाइ नं", "Unit no.")} />
-              <input className="field" required value={unitEdit.draft.title} onChange={(e) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, title: e.target.value } })} placeholder={tx("एकाइको शीर्षक", "Unit title")} />
-              <textarea className="field sm:col-span-2" value={unitEdit.draft.topics} onChange={(e) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, topics: e.target.value } })} placeholder={tx("विषयवस्तु", "Topics")} />
-              <input className="field" type="number" min={0} step={0.5} value={unitEdit.draft.plannedLh} onChange={(e) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, plannedLh: Number(e.target.value) } })} placeholder={tx("योजना LH", "Planned LH")} />
-              <div className="grid grid-cols-2 gap-2">
-                <input className="field" type="date" value={unitEdit.draft.startDate} onChange={(e) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, startDate: e.target.value } })} />
-                <input className="field" type="date" value={unitEdit.draft.endDate} onChange={(e) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, endDate: e.target.value } })} />
-              </div>
-              <textarea className="field" value={unitEdit.draft.methods} onChange={(e) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, methods: e.target.value } })} placeholder={tx("शिक्षण विधि", "Methods")} />
-              <textarea className="field" value={unitEdit.draft.materials} onChange={(e) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, materials: e.target.value } })} placeholder={tx("सामग्री", "Materials")} />
-              <textarea className="field sm:col-span-2" value={unitEdit.draft.assessment} onChange={(e) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, assessment: e.target.value } })} placeholder={tx("मूल्याङ्कन", "Assessment")} />
+              <label className="block text-sm sm:col-span-2">
+                <span className="mb-1 block font-medium">{tx("एकाइको नाम (जस्तै: Unit 1: Introduction)", "Unit name (e.g. Unit 1: Introduction)")}</span>
+                <input className="field" required value={unitEdit.draft.title} onChange={(e) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, title: e.target.value } })} />
+              </label>
+              <label className="block text-sm sm:col-span-2">
+                <span className="mb-1 block font-medium">{tx("मुख्य विषयवस्तु", "Main topics")}</span>
+                <textarea className="field min-h-20" value={unitEdit.draft.topics} onChange={(e) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, topics: e.target.value } })} />
+              </label>
+              <label className="block text-sm sm:col-span-2">
+                <span className="mb-1 block font-medium">{tx("पढाउने घण्टा (LH)", "Lecture hours (LH)")}</span>
+                <input className="field" type="number" min={0} step={0.5} value={unitEdit.draft.plannedLh} onChange={(e) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, plannedLh: Number(e.target.value) } })} />
+              </label>
+              <BsDateInput label={tx("सुरु मिति", "From")} value={unitEdit.draft.startDate} onChange={(iso) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, startDate: iso } })} />
+              <BsDateInput label={tx("अन्त्य मिति", "To")} value={unitEdit.draft.endDate} onChange={(iso) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, endDate: iso } })} />
+              <label className="block text-sm sm:col-span-2">
+                <span className="mb-1 block font-medium">{tx("शिक्षण विधि", "Teaching methods")}</span>
+                <textarea className="field min-h-16" value={unitEdit.draft.methods} onChange={(e) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, methods: e.target.value } })} />
+              </label>
+              <label className="block text-sm sm:col-span-2">
+                <span className="mb-1 block font-medium">{tx("सामग्री", "Materials")}</span>
+                <textarea className="field min-h-16" value={unitEdit.draft.materials} onChange={(e) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, materials: e.target.value } })} />
+              </label>
+              <label className="block text-sm sm:col-span-2">
+                <span className="mb-1 block font-medium">{tx("मूल्याङ्कन", "Assessment")}</span>
+                <textarea className="field min-h-16" value={unitEdit.draft.assessment} onChange={(e) => setUnitEdit({ ...unitEdit, draft: { ...unitEdit.draft, assessment: e.target.value } })} />
+              </label>
               <div className="flex gap-2 sm:col-span-2">
                 <button className="btn" disabled={busy}>{tx("सेभ गर्नुहोस्", "Save")}</button>
                 <button type="button" className="btn-ghost" onClick={() => setUnitEdit(null)}>{tx("रद्द", "Cancel")}</button>
