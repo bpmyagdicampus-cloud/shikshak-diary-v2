@@ -12,7 +12,7 @@ type Teacher = { user_id: string; name: string; department_id: string };
 
 export default function Subjects() {
   const { tx, pick } = useT();
-  const { orgs, ready } = useAllowedOrgs();
+  const { orgs, ready, defaultOrgId } = useAllowedOrgs();
   const [orgId, setOrgId] = useState("");
   const [yearId, setYearId] = useState("");
   const [years, setYears] = useState<Opt[]>([]);
@@ -34,8 +34,8 @@ export default function Subjects() {
   const [lLh, setLLh] = useState(60);
 
   useEffect(() => {
-    if (ready && orgs[0] && !orgId) setOrgId(orgs[0].id);
-  }, [ready, orgs, orgId]);
+    if (ready && defaultOrgId) setOrgId(defaultOrgId);
+  }, [ready, defaultOrgId]);
 
   const loadBase = async (id: string) => {
     const [y, d, s, m] = await Promise.all([

@@ -53,7 +53,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export default function Campus() {
   const { tx } = useT();
-  const { orgs, ready } = useAllowedOrgs();
+  const { orgs, ready, defaultOrgId } = useAllowedOrgs();
   const [orgId, setOrgId] = useState("");
   const [campus, setCampus] = useState<Campus | null>(null);
   const [form, setForm] = useState<Form | null>(null);
@@ -63,8 +63,8 @@ export default function Campus() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (ready && orgs[0] && !orgId) setOrgId(orgs[0].id);
-  }, [ready, orgs, orgId]);
+    if (ready && defaultOrgId) setOrgId(defaultOrgId);
+  }, [ready, defaultOrgId]);
 
   const load = async (id: string) => {
     const { data, error } = await supabase

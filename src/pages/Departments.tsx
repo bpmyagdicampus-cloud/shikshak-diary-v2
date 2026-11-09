@@ -10,7 +10,7 @@ type Program = { id: string; name: string; department_id: string };
 export default function Departments() {
   const { tx, pick } = useT();
   const [deptNameEn, setDeptNameEn] = useState("");
-  const { orgs, ready } = useAllowedOrgs();
+  const { orgs, ready, defaultOrgId } = useAllowedOrgs();
   const [orgId, setOrgId] = useState("");
   const [depts, setDepts] = useState<Dept[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
@@ -20,8 +20,8 @@ export default function Departments() {
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
-    if (ready && orgs[0] && !orgId) setOrgId(orgs[0].id);
-  }, [ready, orgs, orgId]);
+    if (ready && defaultOrgId) setOrgId(defaultOrgId);
+  }, [ready, defaultOrgId]);
 
   const load = async (id: string) => {
     const [d, p] = await Promise.all([

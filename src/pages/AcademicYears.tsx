@@ -17,7 +17,7 @@ function dayBefore(iso: string): string {
 export default function AcademicYears() {
   const { tx } = useT();
   const { t } = useT();
-  const { profile, isSuperAdmin, memberships } = useAuth();
+  const { profile, isSuperAdmin, memberships, activeOrgId } = useAuth();
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [orgId, setOrgId] = useState("");
   const [years, setYears] = useState<Year[]>([]);
@@ -35,9 +35,10 @@ export default function AcademicYears() {
       const all = (data ?? []) as Org[];
       const allowed = isSuperAdmin ? all : all.filter((o) => memberships.some((m) => m.org_id === o.id && m.role === "admin"));
       setOrgs(allowed);
-      if (allowed[0]) setOrgId(allowed[0].id);
+      const pick = allowed.find((o) => o.id === activeOrgId) ?? allowed[0];
+      if (pick) setOrgId(pick.id);
     })();
-  }, [isSuperAdmin, memberships]);
+  }, [isSuperAdmin, memberships, activeOrgId]);
 
   const org = orgs.find((o) => o.id === orgId);
 

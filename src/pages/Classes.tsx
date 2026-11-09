@@ -10,7 +10,7 @@ type Sec = { id: string; class_id: string; name: string };
 
 export default function Classes() {
   const { tx, pick } = useT();
-  const { orgs, ready } = useAllowedOrgs();
+  const { orgs, ready, defaultOrgId } = useAllowedOrgs();
   const [orgId, setOrgId] = useState("");
   const [years, setYears] = useState<Opt[]>([]);
   const [yearId, setYearId] = useState("");
@@ -26,8 +26,8 @@ export default function Classes() {
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
-    if (ready && orgs[0] && !orgId) setOrgId(orgs[0].id);
-  }, [ready, orgs, orgId]);
+    if (ready && defaultOrgId) setOrgId(defaultOrgId);
+  }, [ready, defaultOrgId]);
 
   const loadBase = async (id: string) => {
     const [y, d, p] = await Promise.all([

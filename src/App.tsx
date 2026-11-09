@@ -35,7 +35,7 @@ function RequireRole({ ok, children }: { ok: boolean; children: ReactNode }) {
 }
 
 export default function App() {
-  const { session, isSuperAdmin, memberships, loading } = useAuth();
+  const { session, can, loading } = useAuth();
 
   // Reset link कुनै पनि path मा आए पनि नयाँ पासवर्ड पृष्ठमा लैजाने (redirect allow-list छुटे पनि)
   useEffect(() => {
@@ -45,9 +45,6 @@ export default function App() {
   }, []);
 
   if (loading) return <Loading />;
-  const isAdmin = memberships.some((m) => m.role === "admin");
-  const isHead = memberships.some((m) => m.role === "department_head");
-  const staff = isSuperAdmin || isAdmin;
 
   return (
     <Routes>
@@ -56,14 +53,14 @@ export default function App() {
       <Route element={<RequireAuth><Shell /></RequireAuth>}>
         <Route index element={<Dashboard />} />
         <Route path="account" element={<Account />} />
-        <Route path="superadmins" element={<RequireRole ok={isSuperAdmin}><SuperAdmins /></RequireRole>} />
-        <Route path="orgs" element={<RequireRole ok={isSuperAdmin}><Organizations /></RequireRole>} />
-        <Route path="campus" element={<RequireRole ok={staff}><Campus /></RequireRole>} />
-        <Route path="departments" element={<RequireRole ok={staff}><Departments /></RequireRole>} />
-        <Route path="classes" element={<RequireRole ok={staff || isHead}><Classes /></RequireRole>} />
-        <Route path="subjects" element={<RequireRole ok={staff || isHead}><Subjects /></RequireRole>} />
-        <Route path="members" element={<RequireRole ok={staff}><Members /></RequireRole>} />
-        <Route path="years" element={<RequireRole ok={staff}><AcademicYears /></RequireRole>} />
+        <Route path="superadmins" element={<RequireRole ok={can.superAdmin}><SuperAdmins /></RequireRole>} />
+        <Route path="orgs" element={<RequireRole ok={can.superAdmin}><Organizations /></RequireRole>} />
+        <Route path="campus" element={<RequireRole ok={can.campusAdmin}><Campus /></RequireRole>} />
+        <Route path="departments" element={<RequireRole ok={can.campusAdmin}><Departments /></RequireRole>} />
+        <Route path="classes" element={<RequireRole ok={can.campusAdmin || can.deptHead}><Classes /></RequireRole>} />
+        <Route path="subjects" element={<RequireRole ok={can.campusAdmin || can.deptHead}><Subjects /></RequireRole>} />
+        <Route path="members" element={<RequireRole ok={can.campusAdmin}><Members /></RequireRole>} />
+        <Route path="years" element={<RequireRole ok={can.campusAdmin}><AcademicYears /></RequireRole>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
