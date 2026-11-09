@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./lib/auth";
+import { useAuthStore } from "./lib/store";
 import { useT } from "./lib/i18n";
 import Shell from "./components/Shell";
 import Login from "./pages/Login";
@@ -38,7 +39,10 @@ export default function App() {
   const { session, can, loading, profile } = useAuth();
   const location = useLocation();
 
-  // Reset link कुनै पनि path मा आए पनि नयाँ पासवर्ड पृष्ठमा लैजाने (redirect allow-list छुटे पनि)
+  // Auth sync: एकपटक सुरु हुँदा Zustand store, Supabase auth परिवर्तनमा स्वतः अपडेट
+  useEffect(() => useAuthStore.getState().init(), []);
+
+  // Reset link कुनै पनि path मा आए पनि नयाँ पासवर्ड पृष्ठमा लैजाने
   useEffect(() => {
     if (window.location.hash.includes("type=recovery") && window.location.pathname !== "/reset-password") {
       window.location.replace("/reset-password" + window.location.hash);
@@ -48,7 +52,12 @@ export default function App() {
   if (loading) return <Loading />;
 
   // पासवर्ड रिसेट भएको user ले पहिले नयाँ पासवर्ड सेट गर्नुपर्छ
-  if (session && profile?.must_change_password && location.pathname !== "/account" && location.pathname !== "/reset-password") {
+  if (
+    session &&
+    profile?.must_change_password &&
+    location.pathname !== "/account" &&
+    location.pathname !== "/reset-password"
+  ) {
     return <Navigate to="/account" replace />;
   }
 
@@ -56,7 +65,13 @@ export default function App() {
     <Routes>
       <Route path="/login" element={session ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route element={<RequireAuth><Shell /></RequireAuth>}>
+      <Route
+        element={
+          <RequireAuth>
+            <Shell />
+          </RequireAuth>
+        }
+      >
         <Route index element={<Dashboard />} />
         <Route path="account" element={<Account />} />
         <Route path="superadmins" element={<RequireRole ok={can.superAdmin}><SuperAdmins /></RequireRole>} />
