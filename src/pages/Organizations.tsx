@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { supabase } from "../lib/supabase";
 import { useT } from "../lib/i18n";
 import { asRows, writeOp } from "../lib/crud";
-import ItemMenu, { ArchivedToggle, type ItemAction } from "../components/ItemMenu";
+import { ArchivedToggle, type ItemAction } from "../components/ItemMenu";
 import EntryRow, { InlineEdit } from "../components/EntryRow";
 
 interface OrgRow {
