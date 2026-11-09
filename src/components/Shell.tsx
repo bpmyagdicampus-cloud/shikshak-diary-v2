@@ -12,6 +12,7 @@ export default function Shell() {
     { to: "/", ne: "ड्यासबोर्ड", en: "Dashboard", show: true },
     { to: "/account", ne: "मेरो खाता", en: "My account", show: true },
     { to: "/superadmins", ne: "सुपर एडमिन", en: "Super admins", show: can.superAdmin },
+    { to: "/plans", ne: "शिक्षण योजना", en: "Teaching plans", show: can.teacher || can.deptHead || can.campusAdmin },
     { to: "/diary", ne: "दैनिक डायरी", en: "Daily diary", show: can.teacher },
     { to: "/campus", ne: "क्याम्पस", en: "Campus", show: can.campusAdmin },
     { to: "/orgs", ne: "संस्था", en: "Organizations", show: can.superAdmin },
