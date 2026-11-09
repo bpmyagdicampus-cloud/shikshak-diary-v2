@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useAllowedOrgs } from "../lib/orgs";
 import OrgSelect from "../components/OrgSelect";
@@ -13,45 +13,49 @@ type Row = {
   role: string;
   department_id: string | null;
   is_active: boolean;
-  profiles: { full_name: string; email: string | null; phone: string | null } | null;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
 };
 
-const ROLES = [
-  { v: "admin", ne: "एडमिन", en: "Admin" },
-  { v: "department_head", ne: "विभाग प्रमुख", en: "Department head" },
-  { v: "teacher", ne: "शिक्षक", en: "Teacher" },
-  { v: "student", ne: "विद्यार्थी", en: "Student" },
-];
+const ROLE_KEYS = ["admin", "department_head", "teacher", "student"] as const;
+
+/** manage-user Edge Function को कल (त्रुटि सन्देश सहित) */
+async function manage(body: Record<string, unknown>): Promise<{ data: any; error: string | null }> {
+  const { data, error } = await supabase.functions.invoke("manage-user", { body });
+  if (error) {
+    try {
+      const j = await (error as any).context.json();
+      return { data: null, error: j.error ?? error.message };
+    } catch {
+      return { data: null, error: error.message };
+    }
+  }
+  if (data?.error) return { data: null, error: data.error };
+  return { data, error: null };
+}
 
 export default function Members() {
   const { tx, pick } = useT();
   const { orgs, ready, defaultOrgId } = useAllowedOrgs();
   const { can } = useAuth();
-  const [showNew, setShowNew] = useState(false);
   const [orgId, setOrgId] = useState("");
   const [depts, setDepts] = useState<Dept[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
+  const [selId, setSelId] = useState<string | null>(null);
+  const [showNew, setShowNew] = useState(false);
   const [msg, setMsg] = useState("");
-  const [resetInfo, setResetInfo] = useState<{ name: string; pw: string } | null>(null);
+  const [ok, setOk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [resetPw, setResetPw] = useState<string | null>(null);
 
-  const resetPassword = async (r: Row) => {
-    if (!confirm(tx("यो user को पासवर्ड रिसेट गर्ने?", "Reset this user's password?"))) return;
-    setMsg("");
-    setResetInfo(null);
-    const { data, error } = await supabase.functions.invoke("reset-user-password", { body: { user_id: r.user_id, org_id: orgId } });
-    if (error || (data && data.error)) return setMsg(data?.error ?? error?.message ?? tx("त्रुटि भयो", "Something went wrong"));
-    setResetInfo({ name: r.profiles?.full_name ?? "", pw: data.temporary_password });
-  };
-
-  // नयाँ सदस्यता (user पहिल्यै बनेको हुनुपर्छ; इमेलबाट खोजिन्छ)
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState("teacher");
-  const [dept, setDept] = useState("");
-
-  // सम्पादन
-  const [editId, setEditId] = useState<string | null>(null);
-  const [eName, setEName] = useState("");
-  const [ePhone, setEPhone] = useState("");
+  // फारमका मान (चयन गरिएको सदस्यबाट)
+  const [fName, setFName] = useState("");
+  const [fPhone, setFPhone] = useState("");
+  const [fEmail, setFEmail] = useState("");
+  const [fRole, setFRole] = useState<string>("teacher");
+  const [fDept, setFDept] = useState("");
+  const [fActive, setFActive] = useState(true);
 
   useEffect(() => {
     if (ready && defaultOrgId) setOrgId(defaultOrgId);
@@ -60,11 +64,7 @@ export default function Members() {
   const load = async (id: string) => {
     const [d, m] = await Promise.all([
       supabase.from("departments").select("id,name,name_en").eq("org_id", id).order("name"),
-      supabase
-        .from("memberships")
-        .select("id,user_id,role,department_id,is_active")
-        .eq("org_id", id)
-        .order("created_at"),
+      supabase.from("memberships").select("id,user_id,role,department_id,is_active").eq("org_id", id).order("created_at"),
     ]);
     setDepts((d.data ?? []) as Dept[]);
     if (m.error) {
@@ -81,8 +81,10 @@ export default function Members() {
     setRows(
       mem.map((x) => ({
         ...x,
-        profiles: byId.get(x.user_id) ?? null,
-      })) as Row[]
+        full_name: byId.get(x.user_id)?.full_name ?? "",
+        email: byId.get(x.user_id)?.email ?? null,
+        phone: byId.get(x.user_id)?.phone ?? null,
+      }))
     );
   };
 
@@ -90,118 +92,185 @@ export default function Members() {
     if (orgId) void load(orgId);
   }, [orgId]);
 
-  const deptName = (id: string | null) => depts.find((d) => d.id === id)?.name ?? "—";
-  const needsDept = role === "department_head" || role === "teacher";
-
-  const addMember = async (e: FormEvent) => {
-    e.preventDefault();
+  const select = (r: Row) => {
+    setSelId(r.id);
+    setOk(false);
     setMsg("");
-    if (needsDept && !dept) return setMsg(tx("विभाग छान्नुहोस्।", "Please select a department."));
-    // इमेलबाट user खोज्ने (सुरक्षित RPC: केवल id र नाम फर्काउँछ)
-    const { data: found, error: pErr } = await supabase.rpc("find_user_by_email", { p_email: email.trim() });
-    if (pErr) return setMsg(pErr.message);
-    const prof = (found as { id: string }[] | null)?.[0];
-    if (!prof) return setMsg(tx("यो इमेलको user भेटिएन। पहिले user बनाइएको हुनुपर्छ।", "No user found with this email. Create the user first."));
+    setResetPw(null);
+    setFName(r.full_name);
+    setFPhone(r.phone ?? "");
+    setFEmail(r.email ?? "");
+    setFRole(r.role);
+    setFDept(r.department_id ?? "");
+    setFActive(r.is_active);
+  };
 
-    const { error } = await supabase.from("memberships").insert({
-      user_id: prof.id,
-      org_id: orgId,
-      role,
-      department_id: needsDept ? dept : (dept || null),
+  const sel = rows.find((r) => r.id === selId) ?? null;
+  const deptName = (id: string | null) => {
+    const d = depts.find((x) => x.id === id);
+    return d ? pick(d.name, d.name_en) : "—";
+  };
+  const roleLabel = (r: string) =>
+    ({
+      admin: tx("एडमिन", "Admin"),
+      department_head: tx("विभाग प्रमुख", "Department head"),
+      teacher: tx("शिक्षक", "Teacher"),
+      student: tx("विद्यार्थी", "Student"),
+    } as Record<string, string>)[r] ?? r;
+
+  const run = async (label: string, body: Record<string, unknown>, after?: (data: any) => void) => {
+    setBusy(true);
+    setMsg("");
+    setOk(false);
+    const { data, error } = await manage(body);
+    setBusy(false);
+    if (error) return setMsg(error);
+    setOk(true);
+    setMsg(label);
+    if (after) after(data);
+    await load(orgId);
+  };
+
+  const saveProfile = () =>
+    sel && run(tx("प्रोफाइल सेभ भयो", "Profile saved"), { action: "update_profile", user_id: sel.user_id, full_name: fName, phone: fPhone });
+
+  const saveEmail = () =>
+    sel && fEmail !== (sel.email ?? "") &&
+    run(tx("इमेल सेभ भयो", "Email saved"), { action: "update_email", user_id: sel.user_id, email: fEmail });
+
+  const saveMembership = () => {
+    if (!sel) return;
+    const needsDept = fRole === "department_head" || fRole === "teacher";
+    if (needsDept && !fDept) return setMsg(tx("विभाग छान्नुहोस्।", "Select a department."));
+    return run(tx("भूमिका/विभाग सेभ भयो", "Role and department saved"), {
+      action: "set_membership",
+      membership_id: sel.id,
+      role: fRole,
+      department_id: needsDept ? fDept : null,
+      is_active: fActive,
     });
-    if (error) return setMsg(error.message);
-    setEmail("");
-    setMsg(tx("सदस्यता थपियो", "Member added"));
-    await load(orgId);
   };
 
-  const toggle = async (r: Row) => {
-    const { error } = await supabase.from("memberships").update({ is_active: !r.is_active }).eq("id", r.id);
-    if (error) return setMsg(error.message);
-    await load(orgId);
+  const resetPassword = () => {
+    if (!sel) return;
+    if (!confirm(tx("यो user को पासवर्ड रिसेट गर्ने?", "Reset this user's password?"))) return;
+    return run(tx("पासवर्ड रिसेट भयो", "Password reset"), { action: "reset_password", user_id: sel.user_id, org_id: orgId }, (d) =>
+      setResetPw(d.temporary_password)
+    );
   };
 
-  const startEdit = (r: Row) => {
-    setEditId(r.user_id);
-    setEName(r.profiles?.full_name ?? "");
-    setEPhone(r.profiles?.phone ?? "");
+  const removeMember = () => {
+    if (!sel) return;
+    if (!confirm(tx("यो सदस्यता हटाउने?", "Remove this membership?"))) return;
+    return run(tx("सदस्यता हटाइयो", "Membership removed"), { action: "delete_membership", membership_id: sel.id }, () => setSelId(null));
   };
 
-  const saveEdit = async () => {
-    if (!editId) return;
-    const { error } = await supabase.from("profiles").update({ full_name: eName.trim(), phone: ePhone.trim() || null }).eq("id", editId);
-    if (error) return setMsg(error.message);
-    setEditId(null);
-    await load(orgId);
-  };
+  const inputCls = "field";
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">{tx("सदस्य र भूमिका · Members & Roles", "Members & Roles")}</h1>
-      <OrgSelect orgs={orgs} value={orgId} onChange={setOrgId} />
-
-      <div>
-        <button type="button" className="btn-ghost" onClick={() => setShowNew((v) => !v)}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">{tx("सदस्य र भूमिका", "Members & roles")}</h1>
+        <button className="btn" onClick={() => setShowNew((v) => !v)}>
           {showNew ? tx("फारम बन्द गर्नुहोस्", "Close form") : tx("नयाँ user बनाउनुहोस्", "Create new user")}
         </button>
       </div>
+
+      <OrgSelect orgs={orgs} value={orgId} onChange={setOrgId} />
+
       {showNew && orgId && (
         <NewUserForm orgId={orgId} depts={depts} allowAdmin={can.superAdmin} onDone={() => void load(orgId)} />
       )}
 
-      <div className="text-sm font-semibold text-slate-600">{tx("अवस्थित user लाई इमेलबाट थप्नुहोस्", "Add an existing user by email")}</div>
-      <form onSubmit={addMember} className="card grid gap-3 sm:grid-cols-4">
-        <input className="field" type="email" required placeholder={tx("इमेल (user पहिल्यै बनेको)", "Email (existing user)")} value={email} onChange={(e) => setEmail(e.target.value)} />
-        <select className="field" value={role} onChange={(e) => setRole(e.target.value)}>
-          {ROLES.map((r) => <option key={r.v} value={r.v}>{tx(r.ne, r.en)}</option>)}
-        </select>
-        <select className="field" value={dept} onChange={(e) => setDept(e.target.value)}>
-          <option value="">{needsDept ? tx("विभाग (अनिवार्य)", "Department (required)") : tx("विभाग (वैकल्पिक)", "Department (optional)")}</option>
-          {depts.map((d) => <option key={d.id} value={d.id}>{pick(d.name, d.name_en)}</option>)}
-        </select>
-        <button className="btn">{tx("सदस्य थप्नुहोस्", "Add member")}</button>
-      </form>
-
-      {msg && <p className="text-sm text-slate-600">{msg}</p>}
-      {resetInfo && (
-        <div className="card space-y-2 border-amber-300 bg-amber-50 text-sm">
-          <div>{tx("अस्थायी पासवर्ड (एकपटक मात्र देखिन्छ):", "Temporary password (shown once only):")} <b className="font-mono">{resetInfo.pw}</b></div>
-          <div className="text-slate-600">{resetInfo.name} — {tx("यो पासवर्ड user लाई सुरक्षित रूपमा दिनुहोस्। पहिलो लगइनमा नयाँ पासवर्ड सेट गर्नु पर्छ।", "Give this to the user securely. They must set a new password at first login.")}</div>
-          <button className="btn-ghost text-xs" onClick={() => setResetInfo(null)}>{tx("बन्द गर्नुहोस्", "Close")}</button>
+      <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+        {/* सूची */}
+        <div className="space-y-2">
+          {!rows.length && <p className="text-sm text-slate-500">{tx("यस क्याम्पसमा कुनै सदस्य छैन।", "No members in this campus.")}</p>}
+          {rows.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => select(r)}
+              className={`card block w-full text-left ${selId === r.id ? "border-brand ring-1 ring-brand" : ""} ${r.is_active ? "" : "opacity-60"}`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-semibold">{r.full_name || r.email || "—"}</div>
+                <span className="text-xs text-slate-500">{r.is_active ? tx("सक्रिय", "Active") : tx("निष्क्रिय", "Inactive")}</span>
+              </div>
+              <div className="text-xs text-slate-500">
+                {r.email} · {roleLabel(r.role)} · {deptName(r.department_id)}
+              </div>
+            </button>
+          ))}
         </div>
-      )}
 
-      <div className="space-y-2">
-        {rows.map((r) => (
-          <div key={r.id} className={`card space-y-2 ${r.is_active ? "" : "opacity-60"}`}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <div className="font-semibold">{r.profiles?.full_name || "—"}</div>
-                <div className="text-xs text-slate-500">
-                  {r.profiles?.email} · {ROLES.find((x) => x.v === r.role) && tx(ROLES.find((x) => x.v === r.role)!.ne, ROLES.find((x) => x.v === r.role)!.en)} · {deptName(r.department_id)}
-                  {r.profiles?.phone ? ` · ${r.profiles.phone}` : ""}
+        {/* विवरण र सम्पादन */}
+        <div>
+          {!sel ? (
+            <p className="text-sm text-slate-500">{tx("सूचीबाट सदस्य छान्नुहोस्।", "Select a member from the list.")}</p>
+          ) : (
+            <div className="card space-y-4">
+              <div className="font-semibold">{tx("सदस्यको विवरण", "Member details")}</div>
+
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium">{tx("पूरा नाम", "Full name")}</span>
+                <input className={inputCls} value={fName} onChange={(e) => setFName(e.target.value)} />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium">{tx("फोन", "Phone")}</span>
+                <input className={inputCls} value={fPhone} onChange={(e) => setFPhone(e.target.value)} />
+              </label>
+              <button className="btn-ghost text-sm" disabled={busy} onClick={() => void saveProfile()}>{tx("नाम/फोन सेभ", "Save name/phone")}</button>
+
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium">{tx("लगइन इमेल", "Login email")}</span>
+                <input className={inputCls} type="email" value={fEmail} onChange={(e) => setFEmail(e.target.value)} />
+              </label>
+              <button className="btn-ghost text-sm" disabled={busy || fEmail === (sel.email ?? "")} onClick={() => void saveEmail()}>{tx("इमेल सेभ", "Save email")}</button>
+
+              <div className="border-t border-slate-200 pt-4 grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm">
+                  <span className="mb-1 block font-medium">{tx("भूमिका (यो क्याम्पसमा)", "Role (this campus)")}</span>
+                  <select className={inputCls} value={fRole} onChange={(e) => setFRole(e.target.value)} disabled={!can.superAdmin && fRole === "admin"}>
+                    {ROLE_KEYS.filter((k) => k !== "admin" || can.superAdmin).map((k) => (
+                      <option key={k} value={k}>{roleLabel(k)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-sm">
+                  <span className="mb-1 block font-medium">{tx("विभाग", "Department")}</span>
+                  <select className={inputCls} value={fDept} onChange={(e) => setFDept(e.target.value)}>
+                    <option value="">{tx("छान्नुहोस्", "Select")}</option>
+                    {depts.map((d) => <option key={d.id} value={d.id}>{pick(d.name, d.name_en)}</option>)}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                  <input type="checkbox" checked={fActive} onChange={(e) => setFActive(e.target.checked)} />
+                  {tx("यो क्याम्पसमा सक्रिय (अनचेक = निष्क्रिय)", "Active in this campus (uncheck = deactivate)")}
+                </label>
+              </div>
+              <button className="btn text-sm" disabled={busy} onClick={() => void saveMembership()}>{tx("भूमिका/विभाग सेभ", "Save role/department")}</button>
+
+              <div className="border-t border-slate-200 pt-4 flex flex-wrap gap-2">
+                <button className="btn-ghost text-sm" disabled={busy} onClick={() => void resetPassword()}>{tx("पासवर्ड रिसेट", "Reset password")}</button>
+                <button className="btn-ghost text-sm text-red-600" disabled={busy} onClick={() => void removeMember()}>{tx("सदस्यता हटाउनुहोस्", "Remove membership")}</button>
+              </div>
+
+              {resetPw && (
+                <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
+                  <div>{tx("नयाँ अस्थायी पासवर्ड (नोट गर्नुहोस्):", "New temporary password (note it now):")}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <code className="rounded bg-white px-2 py-1 font-mono">{resetPw}</code>
+                    <button className="btn-ghost text-xs" onClick={() => void navigator.clipboard?.writeText(resetPw)}>{tx("कपी", "Copy")}</button>
+                    <button className="btn-ghost text-xs" onClick={() => setResetPw(null)}>{tx("बन्द", "Close")}</button>
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-2">
-                <button className="btn-ghost text-xs" onClick={() => startEdit(r)}>{tx("सम्पादन", "Edit")}</button>
-                {can.campusAdmin && (
-                  <button className="btn-ghost text-xs" onClick={() => void resetPassword(r)}>{tx("पासवर्ड रिसेट", "Reset password")}</button>
-                )}
-                <button className="btn-ghost text-xs" onClick={() => void toggle(r)}>{r.is_active ? tx("निष्क्रिय", "Deactivate") : tx("सक्रिय", "Activate")}</button>
-              </div>
+              )}
+
+              {msg && <p className={`text-sm ${ok ? "text-emerald-700" : "text-red-600"}`}>{msg}</p>}
             </div>
-            {editId === r.user_id && (
-              <div className="grid gap-2 border-t border-slate-200 pt-2 sm:grid-cols-3">
-                <input className="field" placeholder={tx("पूरा नाम", "Full name")} value={eName} onChange={(e) => setEName(e.target.value)} />
-                <input className="field" placeholder={tx("फोन", "Phone")} value={ePhone} onChange={(e) => setEPhone(e.target.value)} />
-                <div className="flex gap-2">
-                  <button className="btn" onClick={() => void saveEdit()}>{tx("सेभ", "Save")}</button>
-                  <button className="btn-ghost" onClick={() => setEditId(null)}>{tx("रद्द", "Cancel")}</button>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+          )}
+          {!sel && msg && <p className="mt-2 text-sm text-red-600">{msg}</p>}
+        </div>
       </div>
     </div>
   );
