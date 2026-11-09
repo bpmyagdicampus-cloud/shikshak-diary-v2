@@ -15,12 +15,14 @@ interface DeptLite {
 interface ProgLite {
   id: string;
   name: string;
+  name_en: string | null;
   department_id: string;
 }
 
 interface ClassRow {
   id: string;
   name: string;
+  name_en: string | null;
   department_id: string;
   program_id: string | null;
   archived: boolean;
@@ -36,6 +38,7 @@ interface SectionRow {
 interface RawClass {
   id: string;
   name: string;
+  name_en: string | null;
   department_id: string;
   program_id: string | null;
   archived_at: string | null;
@@ -67,6 +70,8 @@ export default function Classes() {
   const [newDept, setNewDept] = useState("");
   const [newProg, setNewProg] = useState("");
   const [newClassName, setNewClassName] = useState("");
+  const [newClassNameEn, setNewClassNameEn] = useState("");
+  const [editNameEn, setEditNameEn] = useState("");
   const [newSectionFor, setNewSectionFor] = useState<Record<string, string>>({});
 
   const [viewKey, setViewKey] = useState<string | null>(null);
@@ -86,7 +91,7 @@ export default function Classes() {
       const [yr, d, p] = await Promise.all([
         supabase.from("academic_years").select("id").eq("org_id", orgId).eq("is_active", true).is("archived_at", null).maybeSingle(),
         supabase.from("departments").select("id,name,name_en").eq("org_id", orgId).is("archived_at", null).order("name"),
-        supabase.from("programs").select("id,name,department_id").eq("org_id", orgId).is("archived_at", null).order("name"),
+        supabase.from("programs").select("id,name,name_en,department_id").eq("org_id", orgId).is("archived_at", null).order("name"),
       ]);
       if (yr.error) throw new Error(yr.error.message);
       if (d.error) throw new Error(d.error.message);
@@ -104,7 +109,7 @@ export default function Classes() {
 
       const cRes = await supabase
         .from("classes")
-        .select("id,name,department_id,program_id,archived_at")
+        .select("id,name,name_en,department_id,program_id,archived_at")
         .eq("org_id", orgId)
         .eq("academic_year_id", activeYear)
         .order("name");
@@ -114,6 +119,7 @@ export default function Classes() {
         rawClasses.map((c) => ({
           id: c.id,
           name: c.name,
+          name_en: c.name_en,
           department_id: c.department_id,
           program_id: c.program_id,
           archived: c.archived_at !== null,
@@ -165,12 +171,14 @@ export default function Classes() {
           department_id: newDept,
           program_id: newProg || null,
           name: newClassName.trim(),
+          name_en: newClassNameEn.trim() || null,
         }),
       tx("कक्षा थपियो", "Class added")
     );
     setBusy(false);
     if (ok) {
       setNewClassName("");
+      setNewClassNameEn("");
       await refresh();
     }
   };
@@ -187,17 +195,22 @@ export default function Classes() {
     }
   };
 
-  const startEdit = (kind: Kind, id: string, name: string) => {
+  const startEdit = (kind: Kind, id: string, name: string, nameEn: string | null) => {
     setViewKey(null);
     setEdit({ kind, id });
     setEditName(name);
+    setEditNameEn(nameEn ?? "");
   };
 
   const saveEdit = async () => {
     if (!edit || !editName.trim()) return;
     setBusy(true);
     const ok = await writeOp(
-      () => supabase.from(table(edit.kind)).update({ name: editName.trim() }).eq("id", edit.id),
+      () =>
+        supabase
+          .from(table(edit.kind))
+          .update(edit.kind === "class" ? { name: editName.trim(), name_en: editNameEn.trim() || null } : { name: editName.trim() })
+          .eq("id", edit.id),
       tx("सेभ भयो", "Saved")
     );
     setBusy(false);
@@ -225,11 +238,11 @@ export default function Classes() {
     await refresh();
   };
 
-  const actionsFor = (kind: Kind, id: string, archived: boolean, name: string): ItemAction[] => {
+  const actionsFor = (kind: Kind, id: string, archived: boolean, name: string, nameEn: string | null): ItemAction[] => {
     const key = `${kind}:${id}`;
     return [
       { label: tx("हेर्नुहोस्", "View"), onClick: () => setViewKey(viewKey === key ? null : key) },
-      { label: tx("सम्पादन", "Edit"), onClick: () => startEdit(kind, id, name) },
+      { label: tx("सम्पादन", "Edit"), onClick: () => startEdit(kind, id, name, nameEn) },
       {
         label: archived ? tx("सक्रिय गर्नुहोस्", "Activate") : tx("निष्क्रिय गर्नुहोस्", "Deactivate"),
         onClick: () => void toggleArchive(kind, id, archived),
@@ -261,9 +274,10 @@ export default function Classes() {
           </select>
           <select className="field" value={newProg} onChange={(e) => setNewProg(e.target.value)} disabled={!newDept}>
             <option value="">{tx("कार्यक्रम (वैकल्पिक)", "Program (optional)")}</option>
-            {progs.filter((p) => p.department_id === newDept).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {progs.filter((p) => p.department_id === newDept).map((p) => <option key={p.id} value={p.id}>{pick(p.name, p.name_en)}</option>)}
           </select>
           <input className="field" required placeholder={tx("कक्षा (जस्तै MBS III)", "Class (e.g. MBS III)")} value={newClassName} onChange={(e) => setNewClassName(e.target.value)} />
+          <input className="field" placeholder={tx("English नाम (वैकल्पिक)", "English name (optional)")} value={newClassNameEn} onChange={(e) => setNewClassNameEn(e.target.value)} />
           <button className="btn" disabled={busy}>{tx("कक्षा थप्नुहोस्", "Add class")}</button>
         </form>
       )}
@@ -275,7 +289,7 @@ export default function Classes() {
           const key = `class:${c.id}`;
           const mySections = sections.filter((s) => s.class_id === c.id && (showArchived || !s.archived));
           return (
-            <EntryRow key={c.id} title={c.name} archived={c.archived} actions={actionsFor("class", c.id, c.archived, c.name)}>
+            <EntryRow key={c.id} title={pick(c.name, c.name_en)} archived={c.archived} actions={actionsFor("class", c.id, c.archived, c.name, c.name_en)}>
               {viewKey === key && (
                 <dl className="grid gap-2 border-t border-slate-200 pt-3 text-sm sm:grid-cols-2">
                   <div><dt className="text-xs text-slate-500">{tx("विभाग", "Department")}</dt><dd>{deptLabel(c.department_id)}</dd></div>
@@ -287,6 +301,7 @@ export default function Classes() {
               {edit?.kind === "class" && edit.id === c.id && (
                 <InlineEdit onSave={() => void saveEdit()} onCancel={() => setEdit(null)} busy={busy}>
                   <input className="field" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                  <input className="field" value={editNameEn} onChange={(e) => setEditNameEn(e.target.value)} placeholder={tx("English नाम", "English name")} />
                 </InlineEdit>
               )}
 
@@ -300,7 +315,7 @@ export default function Classes() {
                           {tx("सेक्सन", "Section")} {s.name}
                           {s.archived && <span className="ml-2 rounded bg-slate-200 px-2 py-0.5 text-xs">{tx("निष्क्रिय", "Inactive")}</span>}
                         </div>
-                        <ItemMenu actions={actionsFor("section", s.id, s.archived, s.name)} />
+                        <ItemMenu actions={actionsFor("section", s.id, s.archived, s.name, null)} />
                       </div>
                       {viewKey === sKey && (
                         <p className="text-xs text-slate-500">

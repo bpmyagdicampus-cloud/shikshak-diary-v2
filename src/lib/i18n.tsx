@@ -42,7 +42,7 @@ const LangCtx = createContext<Ctx | null>(null);
 export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(() => {
     const v = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE) : null;
-    return v === "en" ? "en" : "ne";
+    return v === "ne" ? "ne" : "en";
   });
 
   const setLang = (l: Lang) => {

@@ -16,6 +16,7 @@ interface DeptRow {
 interface ProgRow {
   id: string;
   name: string;
+  name_en: string | null;
   department_id: string;
   archived: boolean;
 }
@@ -30,6 +31,7 @@ interface RawDept {
 interface RawProg {
   id: string;
   name: string;
+  name_en: string | null;
   department_id: string;
   archived_at: string | null;
 }
@@ -51,6 +53,7 @@ export default function Departments() {
   const [newDeptNameEn, setNewDeptNameEn] = useState("");
   const [newProgDept, setNewProgDept] = useState("");
   const [newProgName, setNewProgName] = useState("");
+  const [newProgNameEn, setNewProgNameEn] = useState("");
 
   const [viewKey, setViewKey] = useState<string | null>(null);
   const [edit, setEdit] = useState<{ kind: Kind; id: string } | null>(null);
@@ -68,7 +71,7 @@ export default function Departments() {
     try {
       const [d, p] = await Promise.all([
         supabase.from("departments").select("id,name,name_en,archived_at").eq("org_id", orgId).order("name"),
-        supabase.from("programs").select("id,name,department_id,archived_at").eq("org_id", orgId).order("name"),
+        supabase.from("programs").select("id,name,name_en,department_id,archived_at").eq("org_id", orgId).order("name"),
       ]);
       if (d.error) throw new Error(d.error.message);
       if (p.error) throw new Error(p.error.message);
@@ -84,6 +87,7 @@ export default function Departments() {
         asRows<RawProg>(p.data).map((x) => ({
           id: x.id,
           name: x.name,
+          name_en: x.name_en,
           department_id: x.department_id,
           archived: x.archived_at !== null,
         }))
@@ -133,12 +137,14 @@ export default function Departments() {
           org_id: orgId,
           department_id: newProgDept,
           name: newProgName.trim(),
+          name_en: newProgNameEn.trim() || null,
         }),
       tx("कार्यक्रम थपियो", "Program added")
     );
     setBusy(false);
     if (ok) {
       setNewProgName("");
+      setNewProgNameEn("");
       await refresh();
     }
   };
@@ -155,7 +161,7 @@ export default function Departments() {
     const name = editName.trim();
     if (!name) return;
     setBusy(true);
-    const patch = edit.kind === "dept" ? { name, name_en: editNameEn.trim() || null } : { name };
+    const patch = { name, name_en: editNameEn.trim() || null };
     const ok = await writeOp(
       () => supabase.from(tableOf(edit.kind)).update(patch).eq("id", edit.id),
       tx("सेभ भयो", "Saved")
@@ -239,6 +245,7 @@ export default function Departments() {
               ))}
             </select>
             <input className="field" required placeholder={tx("कार्यक्रमको नाम", "Program name")} value={newProgName} onChange={(e) => setNewProgName(e.target.value)} />
+            <input className="field" placeholder={tx("English नाम (वैकल्पिक)", "English name (optional)")} value={newProgNameEn} onChange={(e) => setNewProgNameEn(e.target.value)} />
             <button className="btn" disabled={busy}>{tx("थप्नुहोस्", "Add")}</button>
           </form>
         </div>
@@ -279,10 +286,10 @@ export default function Departments() {
                     <div key={p.id} className="space-y-2 rounded-lg border border-slate-200 p-3">
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-sm font-medium">
-                          {p.name}
+                          {pick(p.name, p.name_en)}
                           {p.archived && <span className="ml-2 rounded bg-slate-200 px-2 py-0.5 text-xs font-normal">{tx("निष्क्रिय", "Inactive")}</span>}
                         </div>
-                        <ItemMenu actions={actionsFor("prog", p.id, p.archived, p.name, null)} />
+                        <ItemMenu actions={actionsFor("prog", p.id, p.archived, p.name, p.name_en)} />
                       </div>
                       {viewKey === pKey && (
                         <p className="text-xs text-slate-500">
@@ -292,6 +299,7 @@ export default function Departments() {
                       {edit?.kind === "prog" && edit.id === p.id && (
                         <InlineEdit onSave={() => void saveEdit()} onCancel={() => setEdit(null)} busy={busy}>
                           <input className="field" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                        <input className="field" value={editNameEn} onChange={(e) => setEditNameEn(e.target.value)} placeholder={tx("English नाम", "English name")} />
                         </InlineEdit>
                       )}
                     </div>

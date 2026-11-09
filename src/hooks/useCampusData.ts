@@ -15,12 +15,14 @@ export interface DepartmentRow {
 export interface ProgramRow {
   id: string;
   name: string;
+  name_en: string | null;
   department_id: string;
 }
 
 export interface ClassRow {
   id: string;
   name: string;
+  name_en: string | null;
   program_id: string | null;
   academic_year_id: string;
 }
@@ -34,6 +36,7 @@ export interface SectionRow {
 export interface SubjectRow {
   id: string;
   name: string;
+  name_en: string | null;
   code: string | null;
   department_id: string;
 }
@@ -123,7 +126,7 @@ export function usePrograms(departmentId: string | null): ListState<ProgramRow> 
     rowsOf<ProgramRow>(
       supabase
         .from("programs")
-        .select("id,name,department_id")
+        .select("id,name,name_en,department_id")
         .eq("department_id", departmentId ?? "")
         .is("archived_at", null)
         .order("name")
@@ -136,7 +139,7 @@ export function useClasses(programId: string | null, academicYearId: string | nu
     rowsOf<ClassRow>(
       supabase
         .from("classes")
-        .select("id,name,program_id,academic_year_id")
+        .select("id,name,name_en,program_id,academic_year_id")
         .eq("program_id", programId ?? "")
         .eq("academic_year_id", academicYearId ?? "")
         .is("archived_at", null)
@@ -167,7 +170,7 @@ export function useSubjects(departmentId: string | null): ListState<SubjectRow> 
     rowsOf<SubjectRow>(
       supabase
         .from("subjects")
-        .select("id,name,code,department_id")
+        .select("id,name,name_en,code,department_id")
         .eq("department_id", departmentId ?? "")
         .is("archived_at", null)
         .order("name")

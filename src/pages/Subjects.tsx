@@ -12,8 +12,10 @@ interface LinkRow {
   id: string;
   classId: string;
   className: string;
+  classNameEn: string | null;
   subjectId: string;
   subjectName: string;
+  subjectNameEn: string | null;
   subjectCode: string | null;
   departmentId: string;
   teacherId: string | null;
@@ -25,6 +27,7 @@ interface LinkRow {
 interface ClassLite {
   id: string;
   name: string;
+  name_en: string | null;
 }
 
 interface ClassSubjectRaw {
@@ -39,6 +42,7 @@ interface ClassSubjectRaw {
 interface SubjectLite {
   id: string;
   name: string;
+  name_en: string | null;
   code: string | null;
   department_id: string;
 }
@@ -54,7 +58,7 @@ function asRows<T>(data: unknown): T[] {
 }
 
 export default function Subjects() {
-  const { tx } = useT();
+  const { tx, pick } = useT();
   const model = useSetupHierarchy();
   const { orgId, academicYearId } = model;
 
@@ -77,7 +81,7 @@ export default function Subjects() {
   const loadLinks = useCallback(async (campusId: string, yearId: string): Promise<LinkRow[]> => {
     const classRes = await supabase
       .from("classes")
-      .select("id,name")
+      .select("id,name,name_en")
       .eq("org_id", campusId)
       .eq("academic_year_id", yearId);
     if (classRes.error) throw new Error(classRes.error.message);
@@ -96,7 +100,7 @@ export default function Subjects() {
     const subjectIds = [...new Set(raw.map((r) => r.subject_id))];
     const teacherIds = [...new Set(raw.map((r) => r.teacher_user_id).filter((x): x is string => !!x))];
 
-    const subjRes = await supabase.from("subjects").select("id,name,code,department_id").in("id", subjectIds);
+    const subjRes = await supabase.from("subjects").select("id,name,name_en,code,department_id").in("id", subjectIds);
     if (subjRes.error) throw new Error(subjRes.error.message);
     const subjects = new Map(asRows<SubjectLite>(subjRes.data).map((s) => [s.id, s]));
 
@@ -107,16 +111,18 @@ export default function Subjects() {
       asRows<ProfileLite>(profRes.data).forEach((p) => teacherMap.set(p.id, p.full_name));
     }
 
-    const classMap = new Map(classes.map((c) => [c.id, c.name]));
+    const classMap = new Map(classes.map((c) => [c.id, c]));
     return raw
       .map((r) => {
         const subj = subjects.get(r.subject_id);
         return {
           id: r.id,
           classId: r.class_id,
-          className: classMap.get(r.class_id) ?? "—",
+          className: classMap.get(r.class_id)?.name ?? "—",
+          classNameEn: classMap.get(r.class_id)?.name_en ?? null,
           subjectId: r.subject_id,
           subjectName: subj?.name ?? "—",
+          subjectNameEn: subj?.name_en ?? null,
           subjectCode: subj?.code ?? null,
           departmentId: subj?.department_id ?? "",
           teacherId: r.teacher_user_id,
@@ -258,13 +264,13 @@ export default function Subjects() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="font-semibold">
-                    {row.subjectName}
+                    {pick(row.subjectName, row.subjectNameEn)}
                     {row.archived && (
                       <span className="ml-2 rounded bg-slate-200 px-2 py-0.5 text-xs">{tx("निष्क्रिय", "Inactive")}</span>
                     )}
                   </div>
                   <div className="text-xs text-slate-500">
-                    {row.className} · {tx("शिक्षक", "Teacher")}: {row.teacherName} · LH: {row.totalLh}
+                    {pick(row.className, row.classNameEn)} · {tx("शिक्षक", "Teacher")}: {row.teacherName} · LH: {row.totalLh}
                   </div>
                 </div>
                 <ItemMenu actions={actionsFor(row)} />
@@ -272,9 +278,9 @@ export default function Subjects() {
 
               {viewId === row.id && (
                 <dl className="grid gap-2 border-t border-slate-200 pt-3 text-sm sm:grid-cols-2">
-                  <div><dt className="text-xs text-slate-500">{tx("विषय", "Subject")}</dt><dd>{row.subjectName}</dd></div>
+                  <div><dt className="text-xs text-slate-500">{tx("विषय", "Subject")}</dt><dd>{pick(row.subjectName, row.subjectNameEn)}</dd></div>
                   <div><dt className="text-xs text-slate-500">{tx("कोड", "Code")}</dt><dd>{row.subjectCode ?? "—"}</dd></div>
-                  <div><dt className="text-xs text-slate-500">{tx("कक्षा", "Class")}</dt><dd>{row.className}</dd></div>
+                  <div><dt className="text-xs text-slate-500">{tx("कक्षा", "Class")}</dt><dd>{pick(row.className, row.classNameEn)}</dd></div>
                   <div><dt className="text-xs text-slate-500">{tx("शिक्षक", "Teacher")}</dt><dd>{row.teacherName}</dd></div>
                   <div><dt className="text-xs text-slate-500">{tx("कुल LH", "Total LH")}</dt><dd>{row.totalLh}</dd></div>
                   <div><dt className="text-xs text-slate-500">{tx("स्थिति", "Status")}</dt><dd>{row.archived ? tx("निष्क्रिय", "Inactive") : tx("सक्रिय", "Active")}</dd></div>

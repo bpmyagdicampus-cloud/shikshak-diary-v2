@@ -75,7 +75,7 @@ export default function SetupHierarchyForm({ model }: SetupHierarchyFormProps) {
         >
           <option value="">{tx("छान्नुहोस्", "Select")}</option>
           {programs.items.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
+            <option key={p.id} value={p.id}>{pick(p.name, p.name_en)}</option>
           ))}
         </select>
         {hasDept && statusHint(programs, tx("यस विभागमा कार्यक्रम छैन", "No programs in this department"), tx) && (
@@ -94,7 +94,7 @@ export default function SetupHierarchyForm({ model }: SetupHierarchyFormProps) {
         >
           <option value="">{tx("छान्नुहोस्", "Select")}</option>
           {classes.items.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+            <option key={c.id} value={c.id}>{pick(c.name, c.name_en)}</option>
           ))}
         </select>
         {!model.academicYearId && (
@@ -135,7 +135,7 @@ export default function SetupHierarchyForm({ model }: SetupHierarchyFormProps) {
         >
           <option value="">{tx("छान्नुहोस्", "Select")}</option>
           {subjects.items.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}{s.code ? ` (${s.code})` : ""}</option>
+            <option key={s.id} value={s.id}>{pick(s.name, s.name_en)}{s.code ? ` (${s.code})` : ""}</option>
           ))}
         </select>
         {hasDept && statusHint(subjects, tx("यस विभागमा विषय छैन, नयाँ बनाउनुहोस्", "No subjects yet; create a new one"), tx) && (
@@ -150,6 +150,13 @@ export default function SetupHierarchyForm({ model }: SetupHierarchyFormProps) {
           disabled={!hasDept}
           value={values.newSubjectName}
           onChange={(e) => model.setField("newSubjectName", e.target.value)}
+        />
+        <input
+          className="field mt-2"
+          disabled={!hasDept}
+          placeholder={tx("English नाम (वैकल्पिक)", "English name (optional)")}
+          value={values.newSubjectNameEn}
+          onChange={(e) => model.setField("newSubjectNameEn", e.target.value)}
         />
         <input
           className="field mt-2"

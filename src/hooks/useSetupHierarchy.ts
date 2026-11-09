@@ -29,6 +29,7 @@ export interface SetupHierarchyValues {
   subjectId: string;
   /** नयाँ विषय बनाउँदा (भरिएमा subjectId लाई पन्छाउँछ) */
   newSubjectName: string;
+  newSubjectNameEn: string;
   newSubjectCode: string;
   teacherId: string;
   totalLh: number;
@@ -43,7 +44,7 @@ export interface SetupHierarchyResult {
   setClass: (id: string) => void;
   setSection: (id: string) => void;
   setSubject: (id: string) => void;
-  setField: <K extends "newSubjectName" | "newSubjectCode" | "teacherId" | "totalLh">(
+  setField: <K extends "newSubjectName" | "newSubjectNameEn" | "newSubjectCode" | "teacherId" | "totalLh">(
     key: K,
     value: SetupHierarchyValues[K]
   ) => void;
@@ -64,6 +65,7 @@ const EMPTY: SetupHierarchyValues = {
   sectionId: "",
   subjectId: "",
   newSubjectName: "",
+  newSubjectNameEn: "",
   newSubjectCode: "",
   teacherId: "",
   totalLh: 0,
@@ -135,10 +137,10 @@ export function useSetupHierarchy(): SetupHierarchyResult {
     setValues((v) => ({ ...v, sectionId: id }));
   }, []);
   const setSubject = useCallback((id: string) => {
-    setValues((v) => ({ ...v, subjectId: id, newSubjectName: "", newSubjectCode: "" }));
+    setValues((v) => ({ ...v, subjectId: id, newSubjectName: "", newSubjectNameEn: "", newSubjectCode: "" }));
   }, []);
   const setField = useCallback(
-    <K extends "newSubjectName" | "newSubjectCode" | "teacherId" | "totalLh">(key: K, value: SetupHierarchyValues[K]) => {
+    <K extends "newSubjectName" | "newSubjectNameEn" | "newSubjectCode" | "teacherId" | "totalLh">(key: K, value: SetupHierarchyValues[K]) => {
       setValues((v) => ({ ...v, [key]: value }));
     },
     []
@@ -175,6 +177,7 @@ export function useSetupHierarchy(): SetupHierarchyResult {
             org_id: orgId,
             department_id: values.departmentId,
             name: values.newSubjectName.trim(),
+            name_en: values.newSubjectNameEn.trim() || null,
             code: values.newSubjectCode.trim() || null,
           })
           .select("id")
@@ -192,7 +195,7 @@ export function useSetupHierarchy(): SetupHierarchyResult {
       if (linkErr) throw new Error(linkErr.message);
 
       toast.success(tx("विषय सफलतापूर्वक थपियो", "Subject added"));
-      setValues((v) => ({ ...v, subjectId: "", newSubjectName: "", newSubjectCode: "", teacherId: "", totalLh: 0 }));
+      setValues((v) => ({ ...v, subjectId: "", newSubjectName: "", newSubjectNameEn: "", newSubjectCode: "", teacherId: "", totalLh: 0 }));
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
