@@ -59,7 +59,15 @@ interface MembershipRow {
   org_id: string;
   role: AppRole;
   department_id: string | null;
-  organizations: { name: string } | null;
+  /** Supabase embed कहिले object, कहिले array फर्काउँछ */
+  organizations: { name: string } | { name: string }[] | null;
+}
+
+/** organizations embed लाई एउटै नाममा normalize गर्छ */
+function orgName(o: MembershipRow["organizations"]): string {
+  if (!o) return "";
+  if (Array.isArray(o)) return o[0]?.name ?? "";
+  return o.name;
 }
 
 interface OrgRow {
@@ -170,7 +178,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (profileRes.error) throw profileRes.error;
       if (membershipRes.error) throw membershipRes.error;
 
-      const profileRow = profileRes.data as ProfileRow | null;
+      const profileRow = (profileRes.data as unknown) as ProfileRow | null;
       const isSuperAdmin = !!superRes.data;
 
       const profile: UserProfile | null = profileRow
@@ -184,10 +192,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           }
         : null;
 
-      const memberships: Membership[] = ((membershipRes.data ?? []) as MembershipRow[]).map((m) => ({
+      const memberRows = ((membershipRes.data ?? []) as unknown) as MembershipRow[];
+      const memberships: Membership[] = memberRows.map((m) => ({
         id: m.id,
         campusId: m.org_id,
-        campusName: m.organizations?.name ?? "",
+        campusName: orgName(m.organizations),
         role: m.role,
         departmentId: m.department_id,
       }));
@@ -201,7 +210,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           .is("archived_at", null)
           .order("name");
         if (orgErr) throw orgErr;
-        campuses = ((orgs ?? []) as OrgRow[]).map((o) => ({ id: o.id, name: o.name }));
+        const orgRows = ((orgs ?? []) as unknown) as OrgRow[];
+        campuses = orgRows.map((o) => ({ id: o.id, name: o.name }));
       } else {
         const unique = new Map<string, string>();
         memberships.forEach((m) => unique.set(m.campusId, m.campusName));
