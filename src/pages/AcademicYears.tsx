@@ -5,7 +5,7 @@ import { useT } from "../lib/i18n";
 import { useAuthStore } from "../lib/store";
 import { asRows, writeOp } from "../lib/crud";
 import { bsToAdIso, displayDate, academicYearName } from "../lib/dates";
-import ItemMenu, { ArchivedToggle, type ItemAction } from "../components/ItemMenu";
+import { ArchivedToggle, type ItemAction } from "../components/ItemMenu";
 import EntryRow, { InlineEdit } from "../components/EntryRow";
 
 interface YearRow {
