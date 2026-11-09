@@ -16,12 +16,17 @@ export interface DiaryEntryFormProps {
 }
 
 const YEARS = Array.from({ length: 21 }, (_, i) => 2075 + i);
-const MONTHS_NE = ["बैशाख", "जेठ", "असार", "साउन", "भदौ", "असोज", "कार्तिक", "मंसिर", "पुष", "माघ", "फागुन", "चैत"];
-const MONTHS_EN = ["Baisakh", "Jestha", "Ashad", "Shrawan", "Bhadra", "Ashwin", "Kartik", "Mangsir", "Poush", "Magh", "Falgun", "Chaitra"];
+const MONTHS: { ne: string; en: string }[] = [
+  { ne: "बैशाख", en: "Baisakh" }, { ne: "जेठ", en: "Jestha" }, { ne: "असार", en: "Ashad" },
+  { ne: "साउन", en: "Shrawan" }, { ne: "भदौ", en: "Bhadra" }, { ne: "असोज", en: "Ashwin" },
+  { ne: "कार्तिक", en: "Kartik" }, { ne: "मंसिर", en: "Mangsir" }, { ne: "पुष", en: "Poush" },
+  { ne: "माघ", en: "Magh" }, { ne: "फागुन", en: "Falgun" }, { ne: "चैत", en: "Chaitra" },
+];
+
 
 export default function DiaryEntryForm({ options, draft, onChange, onSubmit, onCancel, busy, editing, errorText }: DiaryEntryFormProps) {
-  const { tx, pick, lang } = useT();
-  const months = lang === "ne" ? MONTHS_NE : MONTHS_EN;
+  const { tx, pick } = useT();
+  const months = MONTHS.map((m) => tx(m.ne, m.en));
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
