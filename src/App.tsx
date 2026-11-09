@@ -13,6 +13,7 @@ import Departments from "./pages/Departments";
 import Classes from "./pages/Classes";
 import Subjects from "./pages/Subjects";
 import Members from "./pages/Members";
+import Account from "./pages/Account";
 
 function Loading() {
   const { t } = useT();
@@ -53,6 +54,7 @@ export default function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route element={<RequireAuth><Shell /></RequireAuth>}>
         <Route index element={<Dashboard />} />
+        <Route path="account" element={<Account />} />
         <Route path="superadmins" element={<RequireRole ok={isSuperAdmin}><SuperAdmins /></RequireRole>} />
         <Route path="orgs" element={<RequireRole ok={isSuperAdmin}><Organizations /></RequireRole>} />
         <Route path="departments" element={<RequireRole ok={staff}><Departments /></RequireRole>} />
