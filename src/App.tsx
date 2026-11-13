@@ -18,6 +18,8 @@ import Account from "./pages/Account";
 import Campus from "./pages/Campus";
 import Diary from "./pages/Diary";
 import Plans from "./pages/Plans";
+import AnnualCalendar from "./pages/AnnualCalendar";
+import AcademicCalendar from "./pages/AcademicCalendar";
 
 function Loading() {
   const { t } = useT();
@@ -78,6 +80,8 @@ export default function App() {
         <Route path="account" element={<Account />} />
         <Route path="superadmins" element={<RequireRole ok={can.superAdmin}><SuperAdmins /></RequireRole>} />
         <Route path="orgs" element={<RequireRole ok={can.superAdmin}><Organizations /></RequireRole>} />
+        <Route path="setup/annual-calendar" element={<RequireRole ok={can.campusAdmin}><AnnualCalendar /></RequireRole>} />
+        <Route path="department/academic-calendar" element={<RequireRole ok={can.campusAdmin || can.deptHead || can.teacher}><AcademicCalendar /></RequireRole>} />
         <Route path="plans" element={<RequireRole ok={can.teacher || can.deptHead || can.campusAdmin}><Plans /></RequireRole>} />
         <Route path="diary" element={<RequireRole ok={can.teacher}><Diary /></RequireRole>} />
         <Route path="campus" element={<RequireRole ok={can.campusAdmin}><Campus /></RequireRole>} />
