@@ -50,15 +50,12 @@ export default function Departments() {
   const [busy, setBusy] = useState(false);
 
   const [newDeptName, setNewDeptName] = useState("");
-  const [newDeptNameEn, setNewDeptNameEn] = useState("");
   const [newProgDept, setNewProgDept] = useState("");
   const [newProgName, setNewProgName] = useState("");
-  const [newProgNameEn, setNewProgNameEn] = useState("");
 
   const [viewKey, setViewKey] = useState<string | null>(null);
   const [edit, setEdit] = useState<{ kind: Kind; id: string } | null>(null);
   const [editName, setEditName] = useState("");
-  const [editNameEn, setEditNameEn] = useState("");
 
   const refresh = useCallback(async () => {
     if (!orgId) {
@@ -115,14 +112,12 @@ export default function Departments() {
         supabase.from("departments").insert({
           org_id: orgId,
           name: newDeptName.trim(),
-          name_en: newDeptNameEn.trim() || null,
         }),
       tx("विभाग थपियो", "Department added")
     );
     setBusy(false);
     if (ok) {
       setNewDeptName("");
-      setNewDeptNameEn("");
       await refresh();
     }
   };
@@ -137,23 +132,20 @@ export default function Departments() {
           org_id: orgId,
           department_id: newProgDept,
           name: newProgName.trim(),
-          name_en: newProgNameEn.trim() || null,
         }),
       tx("कार्यक्रम थपियो", "Program added")
     );
     setBusy(false);
     if (ok) {
       setNewProgName("");
-      setNewProgNameEn("");
       await refresh();
     }
   };
 
-  const startEdit = (kind: Kind, id: string, name: string, nameEn: string | null) => {
+  const startEdit = (kind: Kind, id: string, name: string) => {
     setViewKey(null);
     setEdit({ kind, id });
     setEditName(name);
-    setEditNameEn(nameEn ?? "");
   };
 
   const saveEdit = async () => {
@@ -161,7 +153,7 @@ export default function Departments() {
     const name = editName.trim();
     if (!name) return;
     setBusy(true);
-    const patch = { name, name_en: editNameEn.trim() || null };
+    const patch = { name };
     const ok = await writeOp(
       () => supabase.from(tableOf(edit.kind)).update(patch).eq("id", edit.id),
       tx("सेभ भयो", "Saved")
@@ -199,13 +191,12 @@ export default function Departments() {
     kind: Kind,
     id: string,
     archived: boolean,
-    name: string,
-    nameEn: string | null
+    name: string
   ): ItemAction[] => {
     const key = `${kind}:${id}`;
     return [
       { label: tx("हेर्नुहोस्", "View"), onClick: () => setViewKey(viewKey === key ? null : key) },
-      { label: tx("सम्पादन", "Edit"), onClick: () => startEdit(kind, id, name, nameEn) },
+      { label: tx("सम्पादन", "Edit"), onClick: () => startEdit(kind, id, name) },
       {
         label: archived ? tx("सक्रिय गर्नुहोस्", "Activate") : tx("निष्क्रिय गर्नुहोस्", "Deactivate"),
         onClick: () => void toggleArchive(kind, id, archived),
@@ -232,7 +223,6 @@ export default function Departments() {
           <form onSubmit={createDept} className="card space-y-3">
             <div className="font-semibold">{tx("नयाँ विभाग", "New department")}</div>
             <input className="field" required placeholder={tx("विभागको नाम (नेपाली)", "Department name (Nepali)")} value={newDeptName} onChange={(e) => setNewDeptName(e.target.value)} />
-            <input className="field" placeholder={tx("English नाम (वैकल्पिक)", "English name (optional)")} value={newDeptNameEn} onChange={(e) => setNewDeptNameEn(e.target.value)} />
             <button className="btn" disabled={busy}>{tx("थप्नुहोस्", "Add")}</button>
           </form>
 
@@ -245,7 +235,6 @@ export default function Departments() {
               ))}
             </select>
             <input className="field" required placeholder={tx("कार्यक्रमको नाम", "Program name")} value={newProgName} onChange={(e) => setNewProgName(e.target.value)} />
-            <input className="field" placeholder={tx("English नाम (वैकल्पिक)", "English name (optional)")} value={newProgNameEn} onChange={(e) => setNewProgNameEn(e.target.value)} />
             <button className="btn" disabled={busy}>{tx("थप्नुहोस्", "Add")}</button>
           </form>
         </div>
@@ -262,12 +251,11 @@ export default function Departments() {
               key={d.id}
               title={deptNameEn(d)}
               archived={d.archived}
-              actions={actionsFor("dept", d.id, d.archived, d.name, d.name_en)}
+              actions={actionsFor("dept", d.id, d.archived, d.name)}
             >
               {viewKey === key && (
                 <dl className="grid gap-2 border-t border-slate-200 pt-3 text-sm sm:grid-cols-2">
                   <div><dt className="text-xs text-slate-500">{tx("नेपाली नाम", "Nepali name")}</dt><dd>{d.name}</dd></div>
-                  <div><dt className="text-xs text-slate-500">{tx("English नाम", "English name")}</dt><dd>{d.name_en ?? "—"}</dd></div>
                   <div><dt className="text-xs text-slate-500">{tx("कार्यक्रम संख्या", "Programs")}</dt><dd>{myProgs.length}</dd></div>
                 </dl>
               )}
@@ -275,7 +263,6 @@ export default function Departments() {
               {edit?.kind === "dept" && edit.id === d.id && (
                 <InlineEdit onSave={() => void saveEdit()} onCancel={() => setEdit(null)} busy={busy}>
                   <input className="field" value={editName} onChange={(e) => setEditName(e.target.value)} />
-                  <input className="field" value={editNameEn} onChange={(e) => setEditNameEn(e.target.value)} placeholder={tx("English नाम", "English name")} />
                 </InlineEdit>
               )}
 
@@ -289,7 +276,7 @@ export default function Departments() {
                           {pick(p.name, p.name_en)}
                           {p.archived && <span className="ml-2 rounded bg-slate-200 px-2 py-0.5 text-xs font-normal">{tx("निष्क्रिय", "Inactive")}</span>}
                         </div>
-                        <ItemMenu actions={actionsFor("prog", p.id, p.archived, p.name, p.name_en)} />
+                        <ItemMenu actions={actionsFor("prog", p.id, p.archived, p.name)} />
                       </div>
                       {viewKey === pKey && (
                         <p className="text-xs text-slate-500">
@@ -299,7 +286,6 @@ export default function Departments() {
                       {edit?.kind === "prog" && edit.id === p.id && (
                         <InlineEdit onSave={() => void saveEdit()} onCancel={() => setEdit(null)} busy={busy}>
                           <input className="field" value={editName} onChange={(e) => setEditName(e.target.value)} />
-                        <input className="field" value={editNameEn} onChange={(e) => setEditNameEn(e.target.value)} placeholder={tx("English नाम", "English name")} />
                         </InlineEdit>
                       )}
                     </div>
