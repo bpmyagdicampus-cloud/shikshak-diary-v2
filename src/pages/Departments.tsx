@@ -222,7 +222,7 @@ export default function Departments() {
         <div className="grid gap-4 md:grid-cols-2">
           <form onSubmit={createDept} className="card space-y-3">
             <div className="font-semibold">{tx("नयाँ विभाग", "New department")}</div>
-            <input className="field" required placeholder={tx("विभागको नाम (नेपाली)", "Department name (Nepali)")} value={newDeptName} onChange={(e) => setNewDeptName(e.target.value)} />
+            <input className="field" required placeholder={tx("विभागको नाम", "Department name")} value={newDeptName} onChange={(e) => setNewDeptName(e.target.value)} />
             <button className="btn" disabled={busy}>{tx("थप्नुहोस्", "Add")}</button>
           </form>
 
