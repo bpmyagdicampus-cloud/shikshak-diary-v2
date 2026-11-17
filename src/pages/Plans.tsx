@@ -11,6 +11,7 @@ import EntryRow from "../components/EntryRow";
 import BsDateInput from "../components/common/BsDateInput";
 import { useCalendarSummary } from "../hooks/useCalendarSummary";
 import { displayDate } from "../lib/dates";
+import { todayIso } from "../lib/calendarDays";
 
 type Tab = "units" | "lessons" | "approve";
 
@@ -18,7 +19,7 @@ const emptyUnit = (next: number): UnitDraft => ({
   unitNo: next, title: "", topics: "", plannedLh: 0, startDate: "", endDate: "", methods: "", materials: "", assessment: "",
 });
 const emptyLesson = (): LessonDraft => ({
-  unitId: "", planDate: "", lh: 1, title: "", objectives: "", steps: "", resources: "", assessment: "",
+  unitId: "", planDate: todayIso(), lh: 1, title: "", objectives: "", steps: "", resources: "", assessment: "",
 });
 
 interface PendingUnit { id: string; title: string; unit_no: number; class_subject_id: string; }

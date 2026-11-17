@@ -6,6 +6,7 @@ import { useAuth } from "../lib/auth";
 import { useAuthStore } from "../lib/store";
 import { asRows, writeOp } from "../lib/crud";
 import { displayDate } from "../lib/dates";
+import { todayIso } from "../lib/calendarDays";
 import BsDateInput from "../components/common/BsDateInput";
 import EntryRow, { InlineEdit } from "../components/EntryRow";
 import type { ItemAction } from "../components/ItemMenu";
@@ -40,7 +41,7 @@ interface HeaderRaw {
 }
 interface ItemRaw { id: string; item_type: ItemType; title: string; start_date: string; end_date: string; notes: string }
 
-const emptyItem = () => ({ itemType: "internal_exam" as ItemType, title: "", startDate: "", endDate: "", notes: "" });
+const emptyItem = () => ({ itemType: "internal_exam" as ItemType, title: "", startDate: todayIso(), endDate: todayIso(), notes: "" });
 
 export default function AcademicCalendar() {
   const { tx, pick } = useT();
