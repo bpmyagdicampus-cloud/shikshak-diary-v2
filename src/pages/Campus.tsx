@@ -1,11 +1,15 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { toast } from "sonner";
 import { supabase } from "../lib/supabase";
-import { useAllowedOrgs } from "../lib/orgs";
-import OrgSelect from "../components/OrgSelect";
 import { useT } from "../lib/i18n";
-import { bsToAdIso, adIsoToBs } from "../lib/dates";
+import { useAuthStore } from "../lib/store";
+import { displayDate } from "../lib/dates";
+import { todayIso } from "../lib/calendarDays";
+import BsDateInput from "../components/common/BsDateInput";
 
-type Campus = {
+/** क्याम्पस प्रोफाइल: पहिले view (मानक विवरण); Edit थिचेमा मात्र फारम खुल्छ */
+
+interface Campus {
   id: string;
   name: string;
   name_en: string | null;
@@ -15,11 +19,10 @@ type Campus = {
   website: string | null;
   head_name: string | null;
   established_on: string | null;
-  established_calendar: "bs" | "ad" | null;
   academic_year_start_month: number;
-};
+}
 
-type Form = {
+interface Form {
   name: string;
   name_en: string;
   address: string;
@@ -27,10 +30,9 @@ type Form = {
   email: string;
   website: string;
   head_name: string;
-  calendar: "bs" | "ad";
-  established: string; // BS: YYYY-MM-DD, AD: YYYY-MM-DD
+  established: string;
   start_month: number;
-};
+}
 
 const toForm = (c: Campus): Form => ({
   name: c.name ?? "",
@@ -40,39 +42,38 @@ const toForm = (c: Campus): Form => ({
   email: c.email ?? "",
   website: c.website ?? "",
   head_name: c.head_name ?? "",
-  calendar: c.established_calendar ?? "bs",
-  established: c.established_on
-    ? c.established_calendar === "ad"
-      ? c.established_on
-      : adIsoToBs(c.established_on)
-    : "",
+  established: c.established_on ?? "",
   start_month: c.academic_year_start_month ?? 4,
 });
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MONTHS: { ne: string; en: string }[] = [
+  { ne: "बैशाख", en: "Baisakh" }, { ne: "जेठ", en: "Jestha" }, { ne: "असार", en: "Ashad" },
+  { ne: "साउन", en: "Shrawan" }, { ne: "भदौ", en: "Bhadra" }, { ne: "असोज", en: "Ashwin" },
+  { ne: "कार्तिक", en: "Kartik" }, { ne: "मंसिर", en: "Mangsir" }, { ne: "पुष", en: "Poush" },
+  { ne: "माघ", en: "Magh" }, { ne: "फागुन", en: "Falgun" }, { ne: "चैत", en: "Chaitra" },
+];
 
 export default function Campus() {
-  const { tx } = useT();
-  const { orgs, ready, defaultOrgId } = useAllowedOrgs();
-  const [orgId, setOrgId] = useState("");
+  const { tx, lang } = useT();
+  const orgId = useAuthStore((s) => s.currentCampusId);
+  const datePref = useAuthStore((s) => s.profile?.datePref ?? "bs");
+
   const [campus, setCampus] = useState<Campus | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [editing, setEditing] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [ok, setOk] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (ready && defaultOrgId) setOrgId(defaultOrgId);
-  }, [ready, defaultOrgId]);
-
-  const load = async (id: string) => {
+  const load = async () => {
+    if (!orgId) return;
+    setLoading(true);
     const { data, error } = await supabase
       .from("organizations")
-      .select("id,name,name_en,address,phone,email,website,head_name,established_on,established_calendar,academic_year_start_month")
-      .eq("id", id)
+      .select("id,name,name_en,address,phone,email,website,head_name,established_on,academic_year_start_month")
+      .eq("id", orgId)
       .maybeSingle();
-    if (error) return setMsg(error.message);
+    setLoading(false);
+    if (error) return toast.error(error.message);
     const c = data as Campus | null;
     setCampus(c);
     setForm(c ? toForm(c) : null);
@@ -80,30 +81,20 @@ export default function Campus() {
   };
 
   useEffect(() => {
-    if (orgId) void load(orgId);
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId]);
 
-  const set = (k: keyof Form, v: string | number) => form && setForm({ ...form, [k]: v } as Form);
+  const startEdit = () => {
+    if (!campus) return;
+    setForm({ ...toForm(campus), established: campus.established_on || todayIso() });
+    setEditing(true);
+  };
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
     if (!form || !campus) return;
-    setMsg("");
-    setOk(false);
-
-    let established_on: string | null = null;
-    if (form.established) {
-      if (!DATE_RE.test(form.established)) {
-        return setMsg(tx("स्थापना मिति YYYY-MM-DD ढाँचामा लेख्नुहोस्, जस्तै 2050-04-01।", "Enter the establishment date as YYYY-MM-DD."));
-      }
-      if (form.calendar === "bs") {
-        const [y, m, d] = form.established.split("-").map(Number);
-        established_on = bsToAdIso(y, m, d);
-      } else {
-        established_on = form.established;
-      }
-    }
-
+    if (!form.name.trim()) return toast.error(tx("क्याम्पसको नाम लेख्नुहोस्।", "Enter the campus name."));
     setBusy(true);
     const { error } = await supabase
       .from("organizations")
@@ -115,93 +106,101 @@ export default function Campus() {
         email: form.email.trim() || null,
         website: form.website.trim() || null,
         head_name: form.head_name.trim() || null,
-        established_on,
-        established_calendar: established_on ? form.calendar : null,
+        established_on: form.established || null,
+        established_calendar: "bs",
         academic_year_start_month: form.start_month,
       })
       .eq("id", campus.id);
     setBusy(false);
-    if (error) return setMsg(error.message);
-    setOk(true);
-    setMsg(tx("सुरक्षित भयो", "Saved"));
-    await load(campus.id);
+    if (error) return toast.error(error.message);
+    toast.success(tx("क्याम्पस प्रोफाइल सेभ भयो", "Campus profile saved"));
+    await load();
   };
 
-  const field = (label: string, key: keyof Form, type = "text") => (
-    <label className="block text-sm">
-      <span className="mb-1 block font-medium">{label}</span>
-      <input
-        className="field"
-        type={type}
-        disabled={!editing}
-        value={String(form?.[key] ?? "")}
-        onChange={(e) => set(key, e.target.value)}
-      />
-    </label>
+  const Item = ({ label, value }: { label: string; value: string }) => (
+    <div>
+      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
+      <dd className="mt-1 text-base text-slate-900">{value || "—"}</dd>
+    </div>
   );
 
+  if (!orgId) return <p className="text-sm text-slate-500">{tx("क्याम्पस छनोट गर्नुहोस्।", "Select a campus.")}</p>;
+  if (loading && !campus) return <p className="text-sm text-slate-500">{tx("लोड हुँदैछ…", "Loading…")}</p>;
+  if (!campus || !form) return null;
+
+  const monthName = (n: number) => {
+    const m = MONTHS[n - 1];
+    return m ? (lang === "ne" ? m.ne : m.en) : String(n);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">{tx("क्याम्पस प्रोफाइल", "Campus profile")}</h1>
-        {campus && !editing && (
-          <button className="btn" onClick={() => setEditing(true)}>{tx("सम्पादन", "Edit")}</button>
+        <h1 className="text-2xl font-bold">{tx("क्याम्पस प्रोफाइल", "Campus Profile")}</h1>
+        {!editing && (
+          <button className="btn" onClick={startEdit}>{tx("सम्पादन", "Edit")}</button>
         )}
       </div>
 
-      <OrgSelect orgs={orgs} value={orgId} onChange={setOrgId} />
+      {!editing && (
+        <div className="card">
+          <dl className="grid gap-6 sm:grid-cols-2">
+            <Item label={tx("क्याम्पसको नाम (नेपाली)", "Campus name (Nepali)")} value={campus.name} />
+            <Item label={tx("क्याम्पसको नाम (English)", "Campus name (English)")} value={campus.name_en ?? ""} />
+            <Item label={tx("ठेगाना", "Address")} value={campus.address ?? ""} />
+            <Item label={tx("क्याम्पस प्रमुख", "Campus Chief")} value={campus.head_name ?? ""} />
+            <Item label={tx("फोन", "Phone")} value={campus.phone ?? ""} />
+            <Item label={tx("इमेल", "Email")} value={campus.email ?? ""} />
+            <Item label="Website" value={campus.website ?? ""} />
+            <Item label={tx("शैक्षिक वर्ष सुरु महिना", "Academic year start month")} value={monthName(campus.academic_year_start_month)} />
+            <Item label={tx("स्थापना मिति", "Established on")} value={campus.established_on ? displayDate(campus.established_on, datePref) : ""} />
+          </dl>
+        </div>
+      )}
 
-      {!campus || !form ? (
-        <p className="text-sm text-slate-500">{tx("क्याम्पस छनोट गर्नुहोस्।", "Select a campus.")}</p>
-      ) : (
+      {editing && (
         <form onSubmit={save} className="card grid gap-4 sm:grid-cols-2">
-          {field(tx("क्याम्पसको नाम (नेपाली)", "Campus name (Nepali)"), "name")}
-          {field(tx("क्याम्पसको नाम (English)", "Campus name (English)"), "name_en")}
-          {field(tx("ठेगाना", "Address"), "address")}
-          {field(tx("क्याम्पस प्रमुख", "Campus head"), "head_name")}
-          {field(tx("फोन", "Phone"), "phone")}
-          {field(tx("इमेल", "Email"), "email", "email")}
-          {field(tx("Website", "Website"), "website", "url")}
-
           <label className="block text-sm">
-            <span className="mb-1 block font-medium">{tx("सुरु महिना (शैक्षिक वर्ष)", "Academic year start month")}</span>
-            <select className="field" disabled={!editing} value={form.start_month} onChange={(e) => set("start_month", Number(e.target.value))}>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => <option key={m} value={m}>{m}</option>)}
+            <span className="mb-1 block font-medium">{tx("क्याम्पसको नाम (नेपाली) *", "Campus name (Nepali) *")}</span>
+            <input className="field" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">{tx("क्याम्पसको नाम (English)", "Campus name (English)")}</span>
+            <input className="field" value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">{tx("ठेगाना", "Address")}</span>
+            <input className="field" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">{tx("क्याम्पस प्रमुख", "Campus Chief")}</span>
+            <input className="field" value={form.head_name} onChange={(e) => setForm({ ...form, head_name: e.target.value })} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">{tx("फोन", "Phone")}</span>
+            <input className="field" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">{tx("इमेल", "Email")}</span>
+            <input className="field" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">Website</span>
+            <input className="field" type="url" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">{tx("शैक्षिक वर्ष सुरु महिना", "Academic year start month")}</span>
+            <select className="field" value={form.start_month} onChange={(e) => setForm({ ...form, start_month: Number(e.target.value) })}>
+              {MONTHS.map((m, i) => <option key={m.en} value={i + 1}>{lang === "ne" ? m.ne : m.en}</option>)}
             </select>
           </label>
-
-          <label className="block text-sm">
-            <span className="mb-1 block font-medium">{tx("मिति प्रणाली", "Date system")}</span>
-            <select className="field" disabled={!editing} value={form.calendar} onChange={(e) => set("calendar", e.target.value)}>
-              <option value="bs">{tx("विक्रम संवत (BS)", "Bikram Sambat (BS)")}</option>
-              <option value="ad">{tx("ग्रेगोरियन (AD)", "Gregorian (AD)")}</option>
-            </select>
-          </label>
-
-          <label className="block text-sm sm:col-span-2">
-            <span className="mb-1 block font-medium">
-              {tx("स्थापना मिति (YYYY-MM-DD)", "Established on (YYYY-MM-DD)")}
-            </span>
-            <input className="field" disabled={!editing} placeholder={form.calendar === "bs" ? "2050-04-01" : "1993-07-16"} value={form.established} onChange={(e) => set("established", e.target.value)} />
-          </label>
-
-          {editing && (
-            <div className="flex flex-wrap gap-2 sm:col-span-2">
-              <button className="btn" disabled={busy}>{tx("सेभ गर्नुहोस्", "Save")}</button>
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => {
-                  setForm(toForm(campus));
-                  setEditing(false);
-                  setMsg("");
-                }}
-              >
-                {tx("रद्द", "Cancel")}
-              </button>
-            </div>
-          )}
-          {msg && <p className={`text-sm sm:col-span-2 ${ok ? "text-emerald-700" : "text-red-600"}`}>{msg}</p>}
+          <div className="sm:col-span-2">
+            <BsDateInput label={tx("स्थापना मिति", "Established on")} value={form.established} onChange={(iso) => setForm({ ...form, established: iso })} />
+          </div>
+          <div className="flex gap-2 sm:col-span-2">
+            <button className="btn" disabled={busy}>{tx("सेभ गर्नुहोस्", "Save")}</button>
+            <button type="button" className="btn-ghost" onClick={() => { setEditing(false); setForm(toForm(campus)); }}>{tx("रद्द", "Cancel")}</button>
+          </div>
         </form>
       )}
     </div>
